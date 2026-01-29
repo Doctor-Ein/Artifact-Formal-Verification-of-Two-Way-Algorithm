@@ -1,73 +1,105 @@
-# TASE25-Artifact
-This is the artifact of the TASE25 paper ["A Formal Framework for Naturally Specifying and Verifying Sequential Algorithms"](https://arxiv.org/abs/2504.19852).
+# Artifact for Anonymous Submission
+
+This repository contains the artifact accompanying an anonymous submission
+under double-blind review. It includes mechanized Coq developments for
+specifying and verifying sequential algorithms.
 
 ## Code Structure
-Directories/files denoted with `*` are not within the scope of this paper.
-```
+
+Directories/files denoted with `*` are dependencies or auxiliary libraries
+that are not the main focus of the paper.
+
+```text
 .
-├── sets*         # Dependency: Library for set theory
-├── fixedpoints*  # Dependency: Library for order theory and fixed points
-├── monadlib      # Core Monad Library
-│   ├── set_monad      # Set Monad
+├── sets*          # Dependency: Library for set theory
+├── fixedpoints*   # Dependency: Library for order theory and fixed points
+├── ZListLib*      # Dependency: List-related auxiliary library
+├── monadlib       # Core monad library
+│   ├── set_monad
 │   │   ├── Monad.v        # Monad definitions and notations
 │   │   ├── SetBasic.v     # Constructors and properties
-│   │   └── SetHoare.v     # Hoare logic and tactics
-│   ├── state_rel_monad    # State Relation Monad
+│   │   └── SetHoare.v    # Hoare logic and tactics
+│   ├── state_rel_monad
 │   │   ├── StateRelBasic.v    # Constructors and properties
 │   │   ├── StateRelHoare.v    # Hoare logic and tactics
-│   │   └── safeexec_lib.v*    # library for relational Hoare Logic
-│   └── monad_err          # Monad with Error
+│   │   └── safeexec_lib.v*    # Auxiliary library for relational Hoare logic
+│   └── monad_err
 │       ├── MonadErrBasic.v    # Basic constructors and properties
 │       ├── MonadErrLoop.v     # Loop constructors and properties
 │       ├── MonadErrHoare.v    # Hoare logic and tactics
-│       └── monadsafe_lib.v*   # library for relational Hoare Logic
+│       └── monadsafe_lib.v*   # Auxiliary library for relational Hoare logic
 └── examples
-    ├── DFS.v         # DFS example in State Relation Monad
-    ├── KMP.v         # Two-stage proof for the KMP algorithm in Set Monad
-    ├── Listlib.v*    # List lemmas for the KMP proof
-    └── KMPErr.v      # Definition of the KMP algorithm in the Monad with Error
+    ├── DFS.v        # Example: DFS in the state relation monad
+    ├── KMP.v        # Main proof: two-stage verification of KMP in the set monad
+    ├── KMPErr.v     # KMP in the monad with error
+    └── Listlib.v*   # Auxiliary list lemmas used in the KMP proof
+````
+
+**Note.**
+The main technical developments corresponding to the paper are located in
+the `examples/` directory.
+
+## Build Instructions
+
+* Coq version: **8.20.1**
+
+Before compilation, please initialize and update git submodules:
+
+```bash
+git submodule init
+git submodule update
 ```
 
-## How to Compile
-Coq version: 8.15.2
+### Linux / macOS
 
-Before compiling, you shall first fetch git submodules as follows:
+Ensure that `coqc` is in your `PATH`. Then run:
+
+```bash
+make
 ```
-git submodule init; git submodule update
-```
 
-On Windows, you need to manually provide a CONFIGURE file to specify the paths for the required dependencies. Please create an extensionless file named CONFIGURE in the directory and write the path to your Coq installation into that file. There's no need for a CONFIGURE if you're using a Linux system and coq is in bin search path.
+### Windows
 
-For example, in a cygwin build environment, the CONFIGURE file is set as follows:
+On Windows, a configuration file is required to specify the Coq installation
+path.
 
-```
+Create a file named `CONFIGURE` (without extension) in the root directory.
+
+**Example (Cygwin):**
+
+```text
 COQBIN=/cygdrive/d/Coq-8.15/bin/
-SUF=   # Here, you can also set SUF=.exe
+SUF=
 ```
 
-If your build environment is Windows PowerShell, use the following CONFIGURE settings:
+**Example (PowerShell):**
 
-```
+```text
 COQBIN=D:\Coq-8.15\bin\\
 SUF=.exe
 ```
 
-Before compiling, please first check whether your environment has make installed by running:
+Make sure `make` is available:
 
-```
+```bash
 make --version
 ```
 
-If not, you can use mingw32-make or mingw64-make as an alternative (make sure that they are installed):
+If not, `mingw32-make` or `mingw64-make` can be used as alternatives:
 
-```
+```bash
 mingw32-make --version
-or
+# or
 mingw64-make --version
 ```
 
-Then, you can start compiling by running:
+Then compile the project by running:
 
-```
+```bash
 make
 ```
+
+---
+
+All identifying information has been removed for double-blind review.
+
