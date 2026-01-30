@@ -3,8 +3,8 @@ Require Import Classical.
 Require Import Coq.ZArith.ZArith.
 Require Import Coq.micromega.Psatz.
 Require Import Coq.Classes.Morphisms.
-Require Import Coq.Lists.List.
 From MonadLib.StateRelMonad Require Import StateRelBasic.
+Require Import Coq.Lists.List.
 From MonadLib.StateRelMonad Require Import StateRelHoare.
 Import SetsNotation.
 Import MonadNotation.
@@ -27,8 +27,9 @@ Context (default : A).
 Context (patn : list A).
 Context `{CmpA : Cmp A}.
 
+
 (* 利用StateRelMonad定义body， Σ = {tt} ，实际是SetsMonad *)
-Definition maxsuf_cal_body' (cmp_fn : A -> A -> comparison) (s : Z * Z * Z * Z) :
+Definition maxsuf_cal_body (cmp_fn : A -> A -> comparison) (s : Z * Z * Z * Z) :
   program unit (CntOrBrk (Z * Z * Z * Z) (Z * Z)) :=
   let '(i, j, k, p) := s in
   choice
@@ -52,23 +53,18 @@ Definition maxsuf_cal_body' (cmp_fn : A -> A -> comparison) (s : Z * Z * Z * Z) 
           continue (new_i, new_j, new_k, new_p)
       end).
 
-Definition maxsuf_cal' (cmp_fn : A -> A -> comparison) : program unit (Z * Z) :=
+Definition maxsuf_cal: program unit (Z * Z) :=
   res <- repeat_break (maxsuf_cal_body' cmp_fn) (0, 1, 0, 1);; ret res.
 (* 约定：以i表示后缀patn[i+0, i+1,..., n]，k从0开始*)
 
-Definition maxsuf_cal_body := maxsuf_cal_body' cmp.
-Definition maxsuf_cal := maxsuf_cal' cmp.
-
+(* TODO 迁移到ListLib_Extend *)
 Definition skipn' (i : Z) (l : list A): list A :=
   Zsublist i (Zlength l) l.
 
-Definition is_maximal_suffix_param (cmp_fn : A -> A -> comparison) (pos : Z) : Prop :=
+Definition is_maximal_suffix_param (pos : Z) : Prop :=
   0 <= pos <= Zlength patn /\ 
     forall i', 0 <= i' <= Zlength patn ->
     list_lex_ge_param cmp_fn (skipn' pos patn) (skipn' i' patn).
-
-Definition is_maximal_suffix (pos : Z) : Prop :=
-  is_maximal_suffix_param cmp pos.
 
 (* 以下具体定义不变式 *)
 Record var_range (i j k p : Z) : Prop := {
@@ -79,7 +75,7 @@ Record var_range (i j k p : Z) : Prop := {
 
 Definition optimality (i j k p : Z) : Prop :=
   forall i', 0 <= i' < i ->
-    list_lex_gt (skipn' i patn) (skipn' i' patn).
+    list_lex_gt_param cmp_fn (skipn' i patn) (skipn' i' patn).
 
 (* 左闭右开 patn[i, i+k) = patn[j,j+k) *)
 Definition partial_match (i j k p : Z) : Prop :=
@@ -853,7 +849,7 @@ Lemma maxsuf_tc (s : Z * Z * Z * Z):
     (maxsuf_cal_body s)
     (fun x _ => match x with
                 | by_continue s' => True
-                | by_break s' => is_maximal_suffix (fst s')
+                | by_break s' => is_maximal_suffix_fwd (fst s')
                 end).
 Proof.
   destruct s as [[[i j] k] p].
@@ -865,7 +861,7 @@ Proof.
   pose proof Hrange as Hrange'.
   destruct Hrange'.
   destruct range_ijp0 as [z range_ijp0].
-  unfold is_maximal_suffix.
+  unfold is_maximal_suffix_fwd.
   2:{ destruct (cmp  (Znth (j + k) patn default) (Znth (i + k) patn default)).
       hoare_auto.
       - apply Hoare_ret'. tauto.
@@ -942,7 +938,7 @@ Lemma maxsuf_brk (a : Z * Z * Z * Z):
   Hoare
     ((fun s _ => maxsuf_inv' s) a)
     (x <- maxsuf_cal_body a;; break_case x)
-    (fun res _ => is_maximal_suffix (fst res)).
+    (fun res _ => is_maximal_suffix_fwd (fst res)).
 Proof.
   eapply Hoare_bind.
   - apply (maxsuf_tc a).
@@ -959,14 +955,14 @@ Theorem i_is_maximal_suffix:
   Hoare
     (fun _ => True)
     maxsuf_cal
-    (fun res _ => is_maximal_suffix (fst res)).
+    (fun res _ => is_maximal_suffix_fwd (fst res)).
 Proof.
   intros.
   unfold maxsuf_cal. unfold maxsuf_cal'.
   eapply Hoare_bind.
   2:{ intros; apply Hoare_ret. }
   pose proof Hoare_repeat_break' maxsuf_cal_body 
-    (fun s _ => maxsuf_inv' s) (fun res _ => is_maximal_suffix (fst res)).
+    (fun s _ => maxsuf_inv' s) (fun res _ => is_maximal_suffix_fwd (fst res)).
   pose proof maxsuf_inv_cnt.
   pose proof (fun s => H1 s H) as H1.
   pose proof maxsuf_brk.
