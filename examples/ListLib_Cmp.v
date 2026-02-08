@@ -252,11 +252,10 @@ Proof.
   2:{ destruct Hcmp_rev. auto. }
   unfold list_lex_gt_ex in Hcmp.
   unfold list_lex_gt_ex in Hcmp_rev.
-  destruct H as [p [x [y [l1 [l2 H]]]]].
-  destruct H as [H1 [H2 H]].
-  destruct H0 as [p' [x' [y' [l1' [l2' H']]]]].
-  destruct H' as [H1' [H2' H']].
-  
+  destruct Hcmp as [p [x [y [l1 [l2 Hcmp]]]]].
+  destruct Hcmp as [H1 [H2 Hcmp]].
+  destruct Hcmp_rev as [p' [x' [y' [l1' [l2' Hcmp_rev]]]]].
+  destruct Hcmp_rev as [H1' [H2' Hcmp_rev]].
   destruct (Z.lt_trichotomy (Zlength p) (Zlength p')) as [Hlt|[Heq|Hgt]].
   - apply (f_equal (fun l => Zsublist 0 (Zlength p') l)) in H1.
     apply (f_equal (fun l => Zsublist 0 (Zlength p') l)) in H2.
@@ -276,7 +275,7 @@ Proof.
     rewrite Znth_Zsublist_single in H0.
     assert (cmp x y = Eq).
     { rewrite H0. apply cmp_refl. }
-    rewrite H in H3. discriminate.
+    rewrite Hcmp in H3. discriminate.
   - apply (f_equal (fun l => Znth (Zlength p) l default)) in H1.
     apply (f_equal (fun l => Znth (Zlength p') l default)) in H1'.
     rewrite Znth_Zsublist_single in H1.
@@ -289,8 +288,9 @@ Proof.
     rewrite Znth_Zsublist_single in H2'.
     rewrite Heq in H2.
     rewrite H2 in H2'.
-    rewrite H1' in H. rewrite H2' in H.
-    unfold cmp_rev in H'.
+    rewrite H1' in Hcmp. rewrite H2' in Hcmp.
+    unfold cmp_rev in Hcmp_rev.
+    unfold cmp_rev' in Hcmp_rev.
     destruct (cmp x' y'); try discriminate.
   - apply (f_equal (fun l => Zsublist 0 (Zlength p) l)) in H1'.
     apply (f_equal (fun l => Zsublist 0 (Zlength p) l)) in H2'.
@@ -310,6 +310,7 @@ Proof.
     rewrite Znth_Zsublist_single in H0.
     assert (cmp x' y' = Eq).
     { rewrite H0. apply cmp_refl. }
-    unfold cmp_rev in H'.
+    unfold cmp_rev in Hcmp_rev.
+    unfold cmp_rev' in Hcmp_rev.
     destruct (cmp x' y'); try discriminate.
 Qed.

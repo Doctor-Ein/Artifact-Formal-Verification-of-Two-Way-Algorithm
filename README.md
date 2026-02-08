@@ -13,11 +13,11 @@ that are not the main focus of the paper.
 .
 ├── sets*          # Dependency: Library for set theory
 ├── fixedpoints*   # Dependency: Library for order theory and fixed points
-├── ListLibDev*      # Dependency: List-related auxiliary library
+├── ListLibDev*    # Dependency: List-related auxiliary library
 ├── monadlib       # Core monad library
 │   ├── set_monad
-│   │   ├── Monad.v        # Monad definitions and notations
-│   │   ├── SetBasic.v     # Constructors and properties
+│   │   ├── Monad.v       # Monad definitions and notations
+│   │   ├── SetBasic.v    # Constructors and properties
 │   │   └── SetHoare.v    # Hoare logic and tactics
 │   ├── state_rel_monad
 │   │   ├── StateRelBasic.v    # Constructors and properties
