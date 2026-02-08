@@ -6,14 +6,22 @@ Require Import ListLib.Base.Inductive.
 Require Import ListLib.Base.Positional.
 Require Import ListLib.General.Length.
 Require Import ListLib.General.Presuffix.
+Require Import Examples.ListLib_Extend.
 Import ListNotations.
 
 Local Open Scope Z_scope.
 Local Open Scope list.
 
-Section list_lex_cmp_lemma.
-Class Cmp (A: Type) := {
-  cmp : A -> A -> comparison;
+Section lex_cmp.
+Context {A : Type}
+        (default : A).
+Context (cmp : A -> A -> comparison).
+(* a default cmparison function *)
+
+Definition cmp_rev' : A -> A -> comparison :=
+  fun x y => CompOpp (cmp x y).
+
+Class Cmp (cmp : A -> A -> comparison)  := {
   cmp_Lt_Gt : forall x y, cmp x y = Lt -> cmp y x = Gt;
   cmp_Gt_Lt : forall x y, cmp x y = Gt -> cmp y x = Lt;
   cmp_Eq    : forall x y, cmp x y = Eq -> x = y /\ cmp y x = Eq;
@@ -21,40 +29,88 @@ Class Cmp (A: Type) := {
   cmp_trans : forall x y z, cmp x y = Gt -> cmp y z = Gt -> cmp x z = Gt
 }.
 
+Context `{Cmp cmp}. (* introduce a Cmp class for default order *)
+
+Instance Cmp_rev : Cmp cmp_rev'.
+Proof.
+  constructor.
+  - (* Lt -> Gt *)
+    intros.
+    unfold cmp_rev' in *.
+    pose proof cmp_Gt_Lt x y.
+    destruct (cmp x y); try discriminate.
+    rewrite H1; auto.
+  - (* Gt -> Lt *)
+    intros.
+    unfold cmp_rev' in *.
+    pose proof cmp_Lt_Gt x y.
+    destruct (cmp x y); try discriminate.
+    rewrite H1; auto.
+  - (* Eq *)
+    intros.
+    unfold cmp_rev' in *.
+    pose proof cmp_Eq x y.
+    destruct (cmp x y); try discriminate.
+    destruct H1; try auto.
+    rewrite H2. auto.
+  - (* refl *)
+    intros.
+    unfold cmp_rev'.
+    rewrite cmp_refl.
+    auto.
+  - (* trans *)
+    intros.
+    unfold cmp_rev' in *.
+    pose proof cmp_trans z y x.
+    pose proof cmp_Lt_Gt x y.
+    pose proof cmp_Lt_Gt y z.
+    destruct (cmp x y); destruct (cmp y z); try discriminate.
+    specialize (H3 ltac:(easy)).
+    specialize (H4 ltac:(easy)).
+    specialize (H2 H4 H3).
+    pose proof cmp_Gt_Lt z x H2.
+    rewrite H5. auto.
+Qed.
+
+End lex_cmp.
+
+(* =============== Two Instance ================ *)
+
+Section list_lex_cmp.
 Context {A : Type}
-        (default : A)
-        {CmpA : Cmp A}.
+        (default : A).
 
-Definition list_lex_gt_ex (l1 l2 : list A) : Prop :=
+Definition list_lex_gt_ex (cmp_fn : A -> A -> comparison) (l1 l2 : list A) : Prop :=
   exists p x y l1' l2',
-    l1 = p ++ x :: l1' /\ l2 = p ++ y :: l2' /\ cmp x y = Gt.
+    l1 = p ++ x :: l1' /\ 
+    l2 = p ++ y :: l2' /\ 
+    cmp_fn x y = Gt.
 
-Definition list_lex_gt_ex' (l1 l2 : list A) (len : Z) : Prop :=
+Definition list_lex_gt_ex' (cmp_fn : A -> A -> comparison) (l1 l2 : list A) (len : Z) : Prop :=
   Zsublist 0 len l1 = Zsublist 0 len l2 
-    /\ cmp (Znth len l1 default) (Znth len l2 default) = Gt.
+    /\ cmp_fn (Znth len l1 default) (Znth len l2 default) = Gt.
 
-Theorem list_lex_gt_ex_ex' (l1 l2 : list A):
-  (list_lex_gt_ex l1 l2) <-> 
+Theorem list_lex_gt_ex_ex' (cmp_fn : A -> A -> comparison) (l1 l2 : list A):
+  (list_lex_gt_ex cmp_fn l1 l2) <-> 
   (exists len, 
     len < Zlength l1 /\
     len < Zlength l2 /\
-    list_lex_gt_ex' l1 l2 len).
-Proof.
-Admitted.
+    list_lex_gt_ex' cmp_fn l1 l2 len).
+Proof. Admitted.
 
 Definition is_proper_prefix (l1 l2 : list A): Prop :=
   is_prefix l1 l2 /\ Zlength l1 < Zlength l2.
 
-Definition list_lex_gt (l1 l2 : list A) : Prop :=
-  list_lex_gt_ex l1 l2 \/ is_proper_prefix l2 l1.
-(* 两种区分 *)
+(* two cases *)
+Definition list_lex_gt (cmp_fn : A -> A -> comparison) (l1 l2 : list A) : Prop :=
+  list_lex_gt_ex cmp_fn l1 l2 \/ is_proper_prefix l2 l1.
 
-(* 最大后缀严格唯一存在，字典序相等即字符串相等 *)
-Definition list_lex_ge (l1 l2 : list A) : Prop :=
-  list_lex_gt l1 l2 \/ l1 = l2.
+(* maximal suffix is unique, two cases *)
+Definition list_lex_ge (cmp_fn : A -> A -> comparison) (l1 l2 : list A) : Prop :=
+  list_lex_gt cmp_fn l1 l2 \/ l1 = l2.
 
-Fact list_lex_ge_nil:
-  forall l, list_lex_ge l [].
+Fact list_lex_ge_nil (cmp_fn : A -> A -> comparison):
+  forall l, list_lex_ge cmp_fn l [].
 Proof.
   intros.
   set (len := Zlength l).
@@ -72,175 +128,47 @@ Proof.
         lia. (* www发现Zlength还不支持simpl *)
 Qed.
 
-Lemma list_lex_gt_ex_trans:
-  forall l1 l2 l3,
-    list_lex_gt_ex l1 l2 ->
-    list_lex_gt_ex l2 l3 ->
-    list_lex_gt_ex l1 l3.
-Proof.
-Admitted.
+Lemma proper_prefix_discriminate_gt_ex (cmp_fn : A -> A -> comparison) (l1 l2 : list A): 
+  list_lex_gt_ex cmp_fn l1 l2 ->
+  is_proper_prefix l1 l2 -> False.
+Proof. Admitted.
 
-Lemma list_lex_gt_ex_trans':
+Lemma list_lex_gt_ex_trans (cmp_fn : A -> A -> comparison):
   forall l1 l2 l3,
-    list_lex_gt l1 l2 ->
-    list_lex_gt_ex l2 l3 ->
-    list_lex_gt_ex l1 l3.
-Proof.
-Admitted.
+    list_lex_gt_ex cmp_fn l1 l2 ->
+    list_lex_gt_ex cmp_fn l2 l3 ->
+    list_lex_gt_ex cmp_fn l1 l3.
+Proof. Admitted.
 
-Lemma list_lex_gt_trans:
+Lemma list_lex_gt_ex_trans' (cmp_fn : A -> A -> comparison):
   forall l1 l2 l3,
-    list_lex_gt l1 l2 ->
-    list_lex_gt l2 l3 ->
-    list_lex_gt l1 l3.
-Proof.
-Admitted.
+    list_lex_gt cmp_fn l1 l2 ->
+    list_lex_gt_ex cmp_fn l2 l3 ->
+    list_lex_gt_ex cmp_fn l1 l3.
+Proof. Admitted.
 
-Lemma list_lex_gt_ex_plus (l1' l2' l1 l2 : list A):
+Lemma list_lex_gt_trans (cmp_fn : A -> A -> comparison):
+  forall l1 l2 l3,
+    list_lex_gt cmp_fn l1 l2 ->
+    list_lex_gt cmp_fn l2 l3 ->
+    list_lex_gt cmp_fn l1 l3.
+Proof. Admitted.
+
+Lemma list_lex_gt_ex_plus (cmp_fn :A -> A -> comparison) (l1' l2' l1 l2 : list A):
     is_prefix l1' l1 ->
     is_prefix l2' l2 ->
-    list_lex_gt_ex l1' l2' ->
-    list_lex_gt_ex l1 l2.
+    list_lex_gt_ex cmp_fn l1' l2' ->
+    list_lex_gt_ex cmp_fn l1 l2.
+Proof. Admitted.
+
+Lemma list_lex_ge_param_prefix (cmp_fn :A -> A -> comparison) (l1 l2 p : list A): 
+  list_lex_ge cmp_fn l1 l2 ->
+  list_lex_ge cmp_fn (p ++ l1) (p ++ l2).
 Proof.
-Admitted.
-
-End list_lex_cmp_lemma.
-
-Section list_lex_cmp_dual.
-
-Context {A : Type}
-        (default : A)
-        {CmpA : Cmp A}.
-
-(* 定义反序比较器 *)
-Definition cmp_rev (x y : A) : comparison :=
-  CompOpp (cmp x y).
-
-(* 证明反序比较器也满足 Cmp 性质 *)
-Lemma cmp_rev_Lt_Gt : forall x y, cmp_rev x y = Lt -> cmp_rev y x = Gt.
-Proof.
-  intros. unfold cmp_rev in *.
-  destruct (cmp x y) eqn:?; simpl in *; try discriminate.
-  apply cmp_Gt_Lt in Heqc.
-  rewrite Heqc. reflexivity.
-Qed.
-
-Lemma cmp_rev_Gt_Lt : forall x y, cmp_rev x y = Gt -> cmp_rev y x = Lt.
-Proof.
-  intros. unfold cmp_rev in *.
-  destruct (cmp x y) eqn:?; simpl in *; try discriminate.
-  apply cmp_Lt_Gt in Heqc.
-  rewrite Heqc. reflexivity.
-Qed.
-
-Lemma cmp_rev_Eq : forall x y, cmp_rev x y = Eq -> x = y /\ cmp_rev y x = Eq.
-Proof.
-  intros. unfold cmp_rev in *.
-  destruct (cmp x y) eqn:?; simpl in *; try discriminate.
-  apply cmp_Eq in Heqc.
-  destruct Heqc. split; auto.
-  unfold cmp_rev. rewrite H0.
-  rewrite cmp_refl. reflexivity.
-Qed.
-
-Lemma cmp_rev_refl : forall x, cmp_rev x x = Eq.
-Proof.
-  intros. unfold cmp_rev.
-  rewrite cmp_refl. reflexivity.
-Qed.
-
-Lemma cmp_rev_trans : forall x y z, 
-  cmp_rev x y = Gt -> cmp_rev y z = Gt -> cmp_rev x z = Gt.
-Proof.
-  intros. unfold cmp_rev in *.
-  destruct (cmp x y) eqn:Hxy; simpl in *; try discriminate.
-  destruct (cmp y z) eqn:Hyz; simpl in *; try discriminate.
-  apply cmp_Lt_Gt in Hxy.
-  apply cmp_Lt_Gt in Hyz.
-  pose proof (cmp_trans z y x Hyz Hxy).
-  apply cmp_Gt_Lt in H1.
-  rewrite H1. reflexivity.
-Qed.
-
-End list_lex_cmp_dual.
-
-(* ListLib/General/CmpDual.v *)
-
-(* ============================================ *)
-(* 第一部分：参数化定义（没有隐式 CmpA）*)
-(* ============================================ *)
-
-Section list_lex_cmp_parametric.
-
-Context {A : Type}
-        (default : A).
-
-(* 关键：这里 NO CmpA in Context! *)
-
-(* 定义接受显式比较函数的版本 *)
-Definition list_lex_gt_ex_param (cmp_fn : A -> A -> comparison) (l1 l2 : list A) : Prop :=
-  exists p x y l1' l2',
-    l1 = p ++ x :: l1' /\ 
-    l2 = p ++ y :: l2' /\ 
-    cmp_fn x y = Gt.
-
-Definition list_lex_gt_param (cmp_fn : A -> A -> comparison) (l1 l2 : list A) : Prop :=
-  list_lex_gt_ex_param cmp_fn l1 l2 \/ is_proper_prefix l2 l1.
-
-Definition list_lex_ge_param (cmp_fn : A -> A -> comparison) (l1 l2 : list A) : Prop :=
-  list_lex_gt_param cmp_fn l1 l2 \/ l1 = l2.
-
-End list_lex_cmp_parametric.
-
-(* ============================================ *)
-(* 第二部分：具体实例化（有 CmpA）*)
-(* ============================================ *)
-
-Section list_lex_cmp_instances.
-
-Context {A : Type}.
-
-Lemma is_prefix_refl (w : list A):
-  is_prefix w w.
-Proof.
-  unfold is_prefix.
-  exists nil.
-  rewrite app_nil_r.
-  reflexivity.
-Qed.
-
-Lemma Znth_Zsublist_tail (default : A) (p : list A) (x : A):
-  Znth (Zlength p) (p ++ x :: nil) default = x.
-Proof.
-  rewrite app_Znth2.
-  - replace (Zlength p - Zlength p) with 0 by lia.
-    rewrite Znth0_cons. reflexivity.
-  - lia.
-Qed.
-
-Lemma Znth_Zsublist_single (default : A) (p l1 : list A) (x : A): 
-  Znth (Zlength p) (p ++ x :: l1) default = x.
-Proof.
-  assert (p ++ x :: l1 = (p ++ x :: nil) ++ l1).
-  { rewrite <- app_assoc. simpl. reflexivity. }
-  rewrite H. rewrite app_Znth1.
-  - apply Znth_Zsublist_tail.
-  - rewrite Zlength_app.
-    assert (Zlength [x] = 1).
-    { rewrite Zlength_correct. simpl. reflexivity. }
-    pose proof Zlength_nonneg p.
-    lia.
-Qed.
-
-Lemma list_lex_ge_param_prefix 
-  (cmp_fn : A -> A -> comparison) (l1 l2 p : list A): 
-  list_lex_ge_param cmp_fn l1 l2 ->
-  list_lex_ge_param cmp_fn (p ++ l1) (p ++ l2).
-Proof.
-  unfold list_lex_ge_param. intros.
+  unfold list_lex_ge. intros.
   destruct H; [left|right].
   2:{ rewrite H. easy. }
-  unfold list_lex_gt_param in *.
+  unfold list_lex_gt in *.
   destruct H; [left|right].
   2:{ unfold is_proper_prefix in *.
       unfold is_prefix in *.
@@ -250,7 +178,7 @@ Proof.
         rewrite <- app_assoc.
         rewrite H. easy.
       - repeat rewrite Zlength_app. lia. }
-  unfold list_lex_gt_ex_param in *.
+  unfold list_lex_gt_ex in *.
   destruct H as [p' [x [y [l1' [l2' H]]]]].
   destruct H as [H1 [H2 H]].
   exists (p ++ p'). exists x. exists y.
@@ -263,15 +191,14 @@ Proof.
   - apply H.
 Qed.
 
-Lemma list_lex_ge_param_prefix_inv
-  (cmp_fn : A -> A -> comparison) (l1 l2 p : list A):
-  list_lex_ge_param cmp_fn (p ++ l1) (p ++ l2) ->
-  list_lex_ge_param cmp_fn l1 l2.
+Lemma list_lex_ge_param_prefix_inv (cmp_fn :A -> A -> comparison) (l1 l2 p : list A):
+  list_lex_ge cmp_fn (p ++ l1) (p ++ l2) ->
+  list_lex_ge cmp_fn l1 l2.
 Proof.
   intros.
   destruct H; [left|right].
   2:{ apply app_inv_head in H. rewrite H. easy. }
-  unfold list_lex_gt_param in *.
+  unfold list_lex_gt in *.
   destruct H; [left|right].
   2:{ unfold is_proper_prefix in *.
       destruct H. unfold is_prefix in *.
@@ -283,43 +210,53 @@ Proof.
         auto.
       - repeat rewrite Zlength_app in H0.
         lia. }
-  unfold list_lex_gt_ex_param in *.
+  unfold list_lex_gt_ex in *.
 Admitted. (* TODO *)
 
-Lemma list_lex_ge_param_assym
-  (cmp_fn : A -> A -> comparison) (l1 l2 : list A):
-  list_lex_ge_param cmp_fn l1 l2 ->
-  list_lex_ge_param cmp_fn l2 l1 ->
+Lemma list_lex_ge_param_assym (cmp_fn :A -> A -> comparison) (l1 l2 : list A):
+  list_lex_ge cmp_fn l1 l2 ->
+  list_lex_ge cmp_fn l2 l1 ->
   l1 = l2.
 Proof.
   intros.
-  unfold list_lex_ge_param in *.
+  unfold list_lex_ge in *.
   destruct H; destruct H0; [|easy |easy |easy].
-  unfold list_lex_gt_param in *.
+  unfold list_lex_gt in *.
   destruct H; destruct H0.
 Admitted.
 
-Lemma prefix_ordering (default : A) (CmpA : Cmp A): 
-  forall w w', 
-    list_lex_ge_param cmp w w' ->
-    list_lex_ge_param cmp_rev w w' ->
+End list_lex_cmp.
+
+Section list_lex_lemma.
+Context {A : Type}
+        (default : A)
+        (cmp : A -> A -> comparison).
+Context `{Cmp A cmp}.
+
+Definition cmp_rev : A -> A -> comparison :=
+  cmp_rev' cmp.
+
+Lemma prefix_ordering (w w' : list A):
+    list_lex_ge cmp w w' ->
+    list_lex_ge cmp_rev w w' ->
     is_prefix w' w.
 Proof.
-  intros.
-  destruct H.
-  2:{ rewrite H. apply is_prefix_refl. }
-  destruct H0.
-  2:{ rewrite H0. apply is_prefix_refl. }
-  destruct H.
-  2:{ destruct H. auto. }
-  destruct H0.
-  2:{ destruct H0. auto. }
-  unfold list_lex_gt_ex_param in H.
-  unfold list_lex_gt_ex_param in H0.
+  intros Hcmp Hcmp_rev.
+  destruct Hcmp as [Hcmp|Hcmp].
+  2:{ rewrite Hcmp. apply is_prefix_refl. }
+  destruct Hcmp_rev as [Hcmp_rev|Hcmp_rev].
+  2:{ rewrite Hcmp_rev. apply is_prefix_refl. }
+  destruct Hcmp as [Hcmp|Hcmp].
+  2:{ destruct Hcmp. auto. }
+  destruct Hcmp_rev as [Hcmp_rev|Hcmp_rev].
+  2:{ destruct Hcmp_rev. auto. }
+  unfold list_lex_gt_ex in Hcmp.
+  unfold list_lex_gt_ex in Hcmp_rev.
   destruct H as [p [x [y [l1 [l2 H]]]]].
   destruct H as [H1 [H2 H]].
   destruct H0 as [p' [x' [y' [l1' [l2' H']]]]].
   destruct H' as [H1' [H2' H']].
+  
   destruct (Z.lt_trichotomy (Zlength p) (Zlength p')) as [Hlt|[Heq|Hgt]].
   - apply (f_equal (fun l => Zsublist 0 (Zlength p') l)) in H1.
     apply (f_equal (fun l => Zsublist 0 (Zlength p') l)) in H2.
@@ -376,14 +313,3 @@ Proof.
     unfold cmp_rev in H'.
     destruct (cmp x' y'); try discriminate.
 Qed.
-
-Lemma proper_prefix_discriminate_gt_ex 
-  (cmp_fn : A -> A -> comparison) (l1 l2 : list A): 
-  list_lex_gt_ex_param cmp_fn l1 l2 ->
-  is_proper_prefix l1 l2 -> False.
-Proof.
-  intros.
-Admitted.
-
-
-End list_lex_cmp_instances.

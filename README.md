@@ -2,7 +2,7 @@
 
 This repository contains the artifact accompanying an anonymous submission
 under double-blind review. It includes mechanized Coq developments for
-specifying and verifying sequential algorithms.
+specifying and verifying the two-way string matching algorithm.
 
 ## Code Structure
 
@@ -13,7 +13,7 @@ that are not the main focus of the paper.
 .
 ├── sets*          # Dependency: Library for set theory
 ├── fixedpoints*   # Dependency: Library for order theory and fixed points
-├── ZListLib*      # Dependency: List-related auxiliary library
+├── ListLibDev*      # Dependency: List-related auxiliary library
 ├── monadlib       # Core monad library
 │   ├── set_monad
 │   │   ├── Monad.v        # Monad definitions and notations
@@ -29,10 +29,9 @@ that are not the main focus of the paper.
 │       ├── MonadErrHoare.v    # Hoare logic and tactics
 │       └── monadsafe_lib.v*   # Auxiliary library for relational Hoare logic
 └── examples
-    ├── DFS.v        # Example: DFS in the state relation monad
-    ├── KMP.v        # Main proof: two-stage verification of KMP in the set monad
-    ├── KMPErr.v     # KMP in the monad with error
-    └── Listlib.v*   # Auxiliary list lemmas used in the KMP proof
+    ├── MaximalSuffix.v   # Preprocess phase proof
+    ├── TwoWayMatch.v     # Match phase proof
+    └── TwoWayComplete.v  # Main proof: complete verification of two-way algorithm
 ````
 
 **Note.**
@@ -42,13 +41,6 @@ the `examples/` directory.
 ## Build Instructions
 
 * Coq version: **8.20.1**
-
-Before compilation, please initialize and update git submodules:
-
-```bash
-git submodule init
-git submodule update
-```
 
 ### Linux / macOS
 
@@ -68,14 +60,14 @@ Create a file named `CONFIGURE` (without extension) in the root directory.
 **Example (Cygwin):**
 
 ```text
-COQBIN=/cygdrive/d/Coq-8.15/bin/
+COQBIN=/cygdrive/d/Coq-8.20.1/bin/
 SUF=
 ```
 
 **Example (PowerShell):**
 
 ```text
-COQBIN=D:\Coq-8.15\bin\\
+COQBIN=D:\Coq-8.20.1\bin\\
 SUF=.exe
 ```
 
@@ -102,4 +94,3 @@ make
 ---
 
 All identifying information has been removed for double-blind review.
-
