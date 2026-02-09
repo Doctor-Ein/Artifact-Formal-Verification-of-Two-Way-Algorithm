@@ -130,6 +130,11 @@ Qed.
 
 Lemma proper_prefix_discriminate_gt_ex (cmp_fn : A -> A -> comparison) (l1 l2 : list A): 
   list_lex_gt_ex cmp_fn l1 l2 ->
+  is_proper_prefix l2 l1 -> False.
+Proof. Admitted.
+
+Lemma proper_prefix_discriminate_gt_ex' (cmp_fn : A -> A -> comparison) (l1 l2 : list A): 
+  list_lex_gt_ex cmp_fn l1 l2 ->
   is_proper_prefix l1 l2 -> False.
 Proof. Admitted.
 
@@ -213,7 +218,7 @@ Proof.
   unfold list_lex_gt_ex in *.
 Admitted. (* TODO *)
 
-Lemma list_lex_ge_param_assym (cmp_fn :A -> A -> comparison) (l1 l2 : list A):
+Lemma list_lex_ge_param_assym (cmp_fn : A -> A -> comparison) (l1 l2 : list A):
   list_lex_ge cmp_fn l1 l2 ->
   list_lex_ge cmp_fn l2 l1 ->
   l1 = l2.
@@ -314,3 +319,5 @@ Proof.
     unfold cmp_rev' in Hcmp_rev.
     destruct (cmp x' y'); try discriminate.
 Qed.
+
+End list_lex_lemma.

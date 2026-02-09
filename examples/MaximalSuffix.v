@@ -29,7 +29,7 @@ Context `{CmpA : Cmp A}.
 
 
 (* 利用StateRelMonad定义body， Σ = {tt} ，实际是SetsMonad *)
-Definition maxsuf_cal_body (cmp_fn : A -> A -> comparison) (s : Z * Z * Z * Z) :
+Definition maxsuf_cal_body' (cmp_fn : A -> A -> comparison) (s : Z * Z * Z * Z) :
   program unit (CntOrBrk (Z * Z * Z * Z) (Z * Z)) :=
   let '(i, j, k, p) := s in
   choice

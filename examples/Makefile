@@ -17,7 +17,7 @@ FLAG = -R $(SETS_DIR) SetsClass \
 			 -Q $(LISTLIB_DIR) ListLib \
 			 -R . Examples
 
-FILES = ListLib_Extend.v ListLib_Period.v ListLib_Cmp.v MaximalSuffix.v TwoWayMatch.v
+FILES = ListLib_Extend.v ListLib_Period.v ListLib_Cmp.v Preprocessing.v TwoWayMatch.v
 
 $(FILES:%.v=%.vo): %.vo: %.v
 	@echo COQC $(<F)

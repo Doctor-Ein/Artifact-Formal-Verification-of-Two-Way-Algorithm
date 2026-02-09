@@ -10,9 +10,10 @@ Require Import ListLib.Base.Inductive.
 Require Import ListLib.Base.Positional.
 Require Import ListLib.General.Presuffix.
 Require Import ListLib.General.Length.
-Require Import Examples.ListLib_Cmp.
+Require Import Examples.ListLib_Extend.
 Require Import Examples.ListLib_Period.
-Require Import Examples.MaximalSuffix.
+Require Import Examples.ListLib_Cmp.
+Require Import Examples.Preprocessing.
 From MonadLib.SetMonad Require Import SetBasic SetHoare.
 Import SetsNotation.
 Import MonadNotation.
@@ -26,10 +27,14 @@ Parameter (A : Type).
 Parameter (default : A).
 Parameter (patn : list A).
 Parameter (text : list A).
-Parameter CmpA : Cmp A.
-Existing Instance CmpA.
 
 Section critical_factorization_theorem.
+Context (cmp : A -> A -> comparison). (* 默认的正向 *)
+Context `{CmpA : Cmp A cmp}.
+
+Definition cmp_rev : A -> A -> comparison :=
+  cmp_rev' cmp.
+
 Hypothesis patn_nonempty : patn <> nil.
 
 (* 证明预处理阶段和这一阶段的连接性问题 *)
@@ -200,15 +205,14 @@ Proof.
 Qed.
 
 (* 引理：最大后缀的切分点不存在完整的局部周期 *)
-Lemma maxsuffix_cut_no_full_local_period 
-  (cmp_fn : A -> A -> comparison) (i : Z) (w : list A):
-  is_maximal_suffix_param patn cmp_fn i ->
+Lemma maxsuffix_cut_no_full_local_period (cmp_fn : A -> A -> comparison) (i : Z) (w : list A):
+  is_maximal_suffix patn cmp_fn i ->
   is_suffix w (Zsublist 0 i patn) ->
   is_prefix w (Zsublist i (Zlength patn) patn) ->
   w = nil.
 Proof.
   intros. (* 分解 x = uv , v = wt *)
-  unfold is_maximal_suffix_param in H.
+  unfold is_maximal_suffix in H.
   destruct H.
   assert (0 <= 0 <= i /\ i <= Zlength patn) by lia.
   pose proof Zsublist_suffix_range _ _ _ patn H3 H0. clear H3.
@@ -236,8 +240,8 @@ Proof.
   { rewrite (Zsublist_split _ _ i); try lia.
     rewrite <- H8. rewrite H10. reflexivity. }
   rewrite H11 in H6. (* wt >= wwt *)
-  apply list_lex_ge_param_prefix_inv in H6.
-  pose proof list_lex_ge_param_assym _ _ _ H6 H7.
+  apply (list_lex_ge_param_prefix_inv default) in H6.
+  pose proof list_lex_ge_param_assym default _ _ _ H6 H7.
   apply (f_equal (fun l => Zlength l)) in H12.
   rewrite Zlength_app in H12.
   assert (Zlength w = 0) by lia.
@@ -245,8 +249,8 @@ Proof.
 Qed.
 
 Lemma u_not_nil (i j p : Z):
-  is_maximal_suffix_param patn cmp i ->
-  is_maximal_suffix_param patn cmp_rev j ->
+  is_maximal_suffix patn cmp i ->
+  is_maximal_suffix patn cmp_rev j ->
   is_minimal_period default patn p ->
   1 < p -> 
   j <= i ->
@@ -293,8 +297,8 @@ Qed.
 (* 正反序的最大后缀算法得到临界分解 *)
 Theorem fwd_rev_maxsuffix_cut_critical_factorization:
   forall i j p,
-    is_maximal_suffix_param patn cmp i -> 
-    is_maximal_suffix_param patn cmp_rev j ->
+    is_maximal_suffix patn cmp i -> 
+    is_maximal_suffix patn cmp_rev j ->
     is_minimal_period default patn p -> (* 假设已知全局周期 *)
     min_local_period (Z.max i j) p.
 Proof.
@@ -383,7 +387,7 @@ Proof.
               reflexivity.
             - repeat rewrite Zlength_Zsublist; try lia.
           }
-          pose proof proper_prefix_discriminate_gt_ex _ _ _ H16 H18.
+          pose proof proper_prefix_discriminate_gt_ex' default _ _ _ H16 H18.
           tauto.
         + unfold is_proper_prefix in H16.
           unfold skipn' in H16.
@@ -530,7 +534,7 @@ Proof.
         rewrite H20 at 2. rewrite <- app_assoc.
         reflexivity.
       }
-      assert (list_lex_ge_param cmp_rev v' (u'' ++ z')).
+      assert (list_lex_ge cmp_rev v' (u'' ++ z')).
       { assert (u'' ++ z' = skipn' (Zlength patn - (i - j + Zlength v - r)) patn).
         { rewrite <- Zsublist_all in H19.
           pose proof H19 as H19'.
@@ -549,12 +553,12 @@ Proof.
         apply H3.
         subst v. rewrite Zlength_Zsublist; try lia.
       }
-      assert (list_lex_ge_param cmp_rev v z').
-      { rewrite H18 in H20. apply (list_lex_ge_param_prefix_inv _ _ _ _ H20). }
-      assert (list_lex_ge_param cmp v z').
+      assert (list_lex_ge cmp_rev v z').
+      { rewrite H18 in H20. apply (list_lex_ge_param_prefix_inv default _ _ _ _ H20). }
+      assert (list_lex_ge cmp v z').
       { apply H2. lia. }
       assert (is_prefix z' v).
-      { apply (prefix_ordering default CmpA); try auto. }
+      { apply (prefix_ordering default cmp); try auto. }
       assert (is_period default patn r).
       { assert (r = Zlength (u ++ z)).
         { rewrite Zlength_app in H15.
@@ -602,7 +606,8 @@ Proof.
         { rewrite H16. apply Zsublist_is_suffix; try lia. }
         assert (w = nil).
         { apply (maxsuffix_cut_no_full_local_period cmp_rev j w); try auto.
-          split; auto. }
+          split; auto.
+        }
         assert (Zlength w = r).
         { apply (f_equal (fun l => Zlength l)) in H16.
           rewrite Zlength_Zsublist in H16; try lia. }
@@ -629,7 +634,7 @@ Proof.
               rewrite <- Zsublist_split; try lia.
               reflexivity.
             - repeat rewrite Zlength_Zsublist; try lia. }
-          pose proof proper_prefix_discriminate_gt_ex _ _ _ H16 H18.
+          pose proof proper_prefix_discriminate_gt_ex' default _ _ _ H16 H18.
           tauto.
         + unfold is_proper_prefix in H16.
           unfold skipn' in H16.
@@ -762,7 +767,7 @@ Proof.
           reflexivity. }
         rewrite H20 at 2. rewrite <- app_assoc.
         reflexivity. }
-      assert (list_lex_ge_param cmp v (u'' ++ z')).
+      assert (list_lex_ge cmp v (u'' ++ z')).
       { assert (u'' ++ z' = skipn' (Zlength patn - (j - i + Zlength v' - r)) patn).
         { rewrite <- Zsublist_all in H19.
           pose proof H19 as H19'.
@@ -780,12 +785,12 @@ Proof.
         rewrite H20.
         apply H2.
         subst v'. rewrite Zlength_Zsublist; try lia. }
-      assert (list_lex_ge_param cmp_rev v' z').
+      assert (list_lex_ge cmp_rev v' z').
       { subst z'. apply H3. lia. }
-      assert (list_lex_ge_param cmp v' z').
-      { rewrite H18 in H20. apply (list_lex_ge_param_prefix_inv _ _ _ _ H20). }
+      assert (list_lex_ge cmp v' z').
+      { rewrite H18 in H20. apply (list_lex_ge_param_prefix_inv default cmp _ _ _ H20). }
       assert (is_prefix z' v').
-      { apply (prefix_ordering default CmpA); try auto. }
+      { apply (prefix_ordering default cmp); try auto. }
       assert (is_period default patn r).
       { assert (r = Zlength (u' ++ z)).
         { rewrite Zlength_app in H15.
@@ -883,8 +888,7 @@ Qed.
 
 End critical_factorization_theorem.
 
-Section match_algo_def_inner.
-
+Section match_algo_def.
 (* 约定 pos 为text与patn对齐的位置，即匹配位置 *)
 (* 约定 s 为上一次匹配已对齐的前缀长度 *)
 (* 约定 j 为匹配过程中的比较位置 *)
@@ -926,10 +930,6 @@ Definition loop_body (l p : Z) (rec: Z * Z): program (CntOrBrk (Z * Z) (option Z
 
 Definition match_algo (l p : Z) : program (option Z) :=
   repeat_break (loop_body l p) (0, 0). (* 初始化 pos = s = 0 *)
-
-End match_algo_def_inner.
-
-Section match_algo_def.
 
 Definition two_way_algo : program (option Z) :=
   choice
