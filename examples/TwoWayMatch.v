@@ -27,13 +27,18 @@ Parameter (A : Type).
 Parameter (default : A).
 Parameter (patn : list A).
 Parameter (text : list A).
-
-Section critical_factorization_theorem.
-Context (cmp : A -> A -> comparison). (* 默认的正向 *)
-Context `{CmpA : Cmp A cmp}.
+Parameter cmp : A -> A -> comparison.
+Parameter CmpA : Cmp cmp.
+Existing Instance CmpA.
 
 Definition cmp_rev : A -> A -> comparison :=
   cmp_rev' cmp.
+
+Parameter mp : Z.
+Axiom mp_existence : is_minimal_period default patn mp. (* 假设全局周期的逻辑存在性 *)
+Axiom mp_range : mp <= Zlength patn.
+
+Section critical_factorization_theorem.
 
 Hypothesis patn_nonempty : patn <> nil.
 
@@ -815,11 +820,12 @@ Qed.
 
 (* TODO : 从maximal suffix算法来的证明连接 *)
 Record crit_factor_prop (l p : Z): Prop := {
-  Hrange_lp : 0 <= l < p /\ p <= Zlength patn; (* 这里关键分解位置小于p 也需要证明TODO *)
-  Hp : is_minimal_period default patn p; (* 全局周期 *)
-  Hcp : min_local_period l p; (* 全局周期等于关键分解处的最小局部周期 *)
+  Hrange_lp : 0 <= l < mp /\ mp <= Zlength patn; (* 这里关键分解位置小于p 也需要证明TODO *)
+  Hp : 0 <= p <= mp;
+  Hcp: min_local_period l mp; (* 全局周期等于关键分解处的最小局部周期 *)
 }.
 
+(* TODO：命名问题 *)
 Definition crtical_factor_algo: program (Z * Z) :=
   fun '(l, p) => crit_factor_prop l p.
 
@@ -847,16 +853,16 @@ Lemma local_period_multiple_of_period (l w p: Z):
   local_period l w -> 
   crit_factor_prop l p ->
   l + w <= Zlength patn ->
-  exists k, w = k * p.
+  exists k, w = k * mp.
 Proof.
   intros. destruct H0.
   unfold min_local_period in Hcp0.
   destruct Hcp0.
-  unfold is_minimal_period in Hp0.
-  destruct Hp0.
-  set (q := w / p).
-  set (r := w mod p).
-  assert (div_mod_prop w p q r).
+  pose proof mp_existence as Hmper.
+  destruct Hmper.
+  set (q := w / mp).
+  set (r := w mod mp).
+  assert (div_mod_prop w mp q r).
   { apply Z_pos_div_mod_prop; try auto. 
     - destruct H. lia.
     - destruct H3. lia. }
@@ -866,7 +872,7 @@ Proof.
   1:{ exists q. lia. } (* 再排除 r > 0 的情形 *)
   assert (local_period l r).
   { assert (Zsublist l (l + r) patn = Zsublist (l + w - r) (l + w) patn).
-    { apply (periodic_segment' default patn p q); auto; try lia. } 
+    { apply (periodic_segment' default patn mp q); auto; try lia. } 
     unfold local_period.
     split; [|split]; try lia. intros.
     unfold local_period in H.
@@ -912,24 +918,23 @@ Definition match_left_f (pos s j: Z): program (CntOrBrk Z Z) :=
 Definition match_left (pos s start: Z) : program Z :=
   repeat_break (match_left_f pos s) start.
 
-Definition loop_body (l p : Z) (rec: Z * Z): program (CntOrBrk (Z * Z) (option Z)) :=
-  let '(pos, s) := rec in
+Definition loop_body (l p pos: Z): program (CntOrBrk Z (option Z)) :=
   choice
     (assume (pos + Zlength patn <= Zlength text);;
-      j <- match_right pos (Z.max l s);;
+      j <- match_right pos l;;
       choice
         (assume (j = Zlength patn);;
-          j' <- match_left pos s (l - 1);;
+          j' <- match_left pos 0 (l - 1);;
           choice
-            (assume (j' < s);; break (Some pos)) (* 匹配成功 *)
-            (assume (j' >= s);; continue (pos + p, Zlength patn - p)) (* 左侧失配跳转*)
+            (assume (j' < 0);; break (Some pos)) (* 匹配成功 *)
+            (assume (j' >= 0);; continue (pos + p)) (* 左侧失配跳转*)
         )
-        (assume (j < Zlength patn);; continue (pos + j - l + 1, 0)) (* 右侧失配跳转 *)
+        (assume (j < Zlength patn);; continue (pos + j - l + 1)) (* 右侧失配跳转 *)
     )
     (assume (pos + Zlength patn > Zlength text);; break None). (* 全体失败 *)
 
 Definition match_algo (l p : Z) : program (option Z) :=
-  repeat_break (loop_body l p) (0, 0). (* 初始化 pos = s = 0 *)
+  repeat_break (loop_body l p) 0. (* 初始化 pos = 0 *)
 
 Definition two_way_algo : program (option Z) :=
   choice
@@ -955,28 +960,17 @@ Definition match_post (res : option Z): Prop :=
   | None => no_occur (Zlength text)
   end.
 
-Record match_inv (pos s : Z) : Prop :={
+Record match_inv (pos : Z) : Prop :={
   Hpos : 0 <= pos;
-  Hrange_s : 0 <= s < Zlength patn;
-  Hmem : Zsublist 0 s patn = Zsublist pos (pos + s) text;
   Hnoc : no_occur pos
 }.
 
 Lemma match_inv_init:
   patn <> nil ->
-  match_inv 0 0.
+  match_inv 0.
 Proof.
   constructor.
   - reflexivity.
-  - pose proof Zlength_nonneg patn.
-    assert (Zlength patn = 0 \/ 0 < Zlength patn) by lia.
-    destruct H1; [|auto].
-    apply Zlength_zero_iff_nil in H1.
-    + contradiction.
-    + lia.
-  - rewrite Zsublist_nil; try lia.
-    rewrite Zsublist_nil; try lia.
-    reflexivity.
   - unfold no_occur.
     intros. lia.
 Qed.
@@ -992,13 +986,13 @@ Record match_right_post (l pos j: Z): Prop := {
   Hnpm_mrp : j >= Zlength patn \/ Znth j patn default <> Znth (pos + j) text default
 }.
 
-Lemma match_right_prop (l p pos s: Z):
+Lemma match_right_prop (l p pos: Z):
   patn <> nil ->
   crit_factor_prop l p ->
-  match_inv pos s ->
+  match_inv pos ->
   pos + Zlength patn <= Zlength text ->
   Hoare
-    (match_right pos (Z.max l s))
+    (match_right pos l)
     (match_right_post l pos).
 Proof.
   intros.
@@ -1024,48 +1018,36 @@ Proof.
   - destruct H0.
     destruct H1.
     constructor; [lia|].
-    assert (l >= s \/ l < s) by lia.
-    destruct H0.
-    + replace (Z.max l s) with l by lia.
-      repeat rewrite Zsublist_nil; try lia.
-      reflexivity.
-    + replace (Z.max l s) with s by lia.
-      apply (f_equal (fun l' => Zsublist l s l')) in Hmem0.
-      rewrite Zsublist_Zsublist in Hmem0; try lia.
-      rewrite Zsublist_Zsublist in Hmem0; try lia.
-      replace (l + 0) with l in Hmem0 by lia.
-      replace (s + 0) with s in Hmem0 by lia.
-      replace (l + pos) with (pos + l) in Hmem0 by lia.
-      replace (s + pos) with (pos + s) in Hmem0 by lia.
-      apply Hmem0.
+    repeat rewrite Zsublist_nil; try lia.
+    reflexivity.
 Qed.
 
-Record match_left_inv (l pos s j: Z): Prop := {
-  jrange_mli: s - 1 <= j < l \/ (j = l - 1 /\ j < s); (* 起始状态 *)
+Record match_left_inv (l pos j: Z): Prop := {
+  jrange_mli: - 1 <= j < l; (* 起始状态 *)
   Hpm_mli : Zsublist (j + 1) l patn = Zsublist (pos + j + 1) (pos + l) text
 }.
 
 (* 按理说无jrange *)
-Record match_left_post (l pos s j: Z): Prop := {
+Record match_left_post (l pos j: Z): Prop := {
   Hjrange_mlp : -1 <= j < l;
   Hpm_mlp : Zsublist (j + 1) l patn = Zsublist (pos + j + 1) (pos + l) text;
-  Hnpm_mlp: j < s \/ Znth j patn default <> Znth (pos + j) text default; (* j < s 包括了起始状态的不满足 *)
+  Hnpm_mlp: j < 0 \/ Znth j patn default <> Znth (pos + j) text default; (* j < s 包括了起始状态的不满足 *)
 }.
 
-Lemma match_left_prop (l p pos s: Z):
+Lemma match_left_prop (l p pos: Z):
   patn <> nil ->
   crit_factor_prop l p ->
-  match_inv pos s ->
+  match_inv pos ->
   pos + Zlength patn <= Zlength text ->
   match_right_post l pos (Zlength patn) ->
   Hoare
-    (match_left pos s (l - 1))
-    (match_left_post l pos s).
+    (match_left pos 0 (l - 1))
+    (match_left_post l pos).
 Proof.
   intros.
   destruct H0. destruct H1. destruct H3.
   unfold match_left.
-  apply Hoare_repeat_break with (P := match_left_inv l pos s).
+  apply Hoare_repeat_break with (P := match_left_inv l pos).
   - intros j ?.
     unfold match_left_f.
     hoare_auto.
@@ -1090,27 +1072,25 @@ Proof.
     reflexivity.
 Qed.
 
-Definition match_inv_continue (a : CntOrBrk (Z * Z) (option Z)) : Prop :=
+Definition match_inv_continue (a : CntOrBrk Z (option Z)) : Prop :=
   match a with
-  | by_continue x => let '(pos, s) := x in match_inv pos s
+  | by_continue pos => match_inv pos
   | by_break x => True
   end.
 
-Lemma match_inv_continue_right (l p pos s j: Z): 
+Lemma match_inv_continue_right (l p pos j: Z): 
   patn <> nil ->
   crit_factor_prop l p ->
-  match_inv pos s ->
+  match_inv pos ->
   pos + Zlength patn <= Zlength text ->
   match_right_post l pos j ->
   j < Zlength patn ->
-  match_inv_continue (by_continue (pos + j - l + 1, 0)).
+  match_inv_continue (by_continue (pos + j - l + 1)).
 Proof.
   intros.
   destruct H0. destruct H1. destruct H3.
   unfold match_inv_continue.
-  constructor; [lia| lia| |].
-  - repeat rewrite Zsublist_nil; try lia.
-    reflexivity.
+  constructor; [lia| ].
   - unfold no_occur.
     intros t ?.
     assert (t < pos \/ pos <= t < pos + j - l + 1) by lia.
@@ -1125,15 +1105,15 @@ Proof.
     (* 反证法准备第二段匹配 *)
     intros Hnot.
     (* 讨论 t - pos 位移与周期p的关系， 若为周期的整数倍则矛盾 *)
-    set (q := (t - pos) / p).
-    set (r := (t - pos) mod p).
-    assert (div_mod_prop (t - pos) p q r).
+    set (q := (t - pos) / mp).
+    set (r := (t - pos) mod mp).
+    assert (div_mod_prop (t - pos) mp q r).
     { apply Z_pos_div_mod_prop; auto; try lia. }
     destruct H3.
-    assert (r = 0 \/ 0 < r < p) by lia.
+    assert (r = 0 \/ 0 < r < mp) by lia.
     destruct H3.
     + (* r = 0 时，即证明若位移为周期p的整数倍，不能再次匹配上 *)
-      assert (t - pos = p * q) by lia.
+      assert (t - pos = mp * q) by lia.
       destruct Hnpm_mrp0; [lia|]. (* 前者是j >= Zlength patn的范围矛盾ok *)
       assert (Znth (j - (t - pos)) patn default = Znth (pos + j) text default).
       { apply (f_equal (fun lx => Znth (j - (t - pos)) lx default)) in Hnot.
@@ -1141,8 +1121,8 @@ Proof.
         replace (j - (t - pos) + t) with (pos + j) in Hnot by lia.
         rewrite Hnot. reflexivity. }
       assert (Znth (j - (t - pos)) patn default = Znth j patn default).
-      { destruct Hp0.
-        apply (is_period_ext default p q); auto; try lia. }
+      { destruct mp_existence.
+        apply (is_period_ext default mp q); auto; try lia. }
       rewrite H8 in H7.
       contradiction.
     + (* r > 0 时，核心思路就在借助text串匹配两个patn串，得到local_period *)
@@ -1187,165 +1167,150 @@ Proof.
           rewrite <- Hnot. reflexivity.
       }
       (* 已经得到了位移距离即local_period，则可以引理得到t - pos = k * p，进而推出矛盾 *)
-      assert (exists k : Z, t - pos = k * p).
+      assert (exists k : Z, t - pos = k * mp).
       { apply (local_period_multiple_of_period l (t - pos) p); auto; try lia. 
         constructor; auto. }
       destruct H6 as [q' H6].
       destruct (Z.lt_trichotomy q q') as [Hlt | [Heq | Hgt]]; try nia.
 Qed.
 
-Lemma match_inv_continue_left (l p pos s j : Z):
-  j >= s -> (* 来自assume的条件 *)
+Lemma match_inv_continue_left (l p pos j : Z):
+  j >= 0 -> (* 来自assume的条件 *)
   patn <> nil ->
   crit_factor_prop l p ->
-  match_inv pos s ->
+  match_inv pos ->
   pos + Zlength patn <= Zlength text ->
   match_right_post l pos (Zlength patn) ->
-  match_left_post l pos s j ->
-  match_inv (pos + p) (Zlength patn - p).
+  match_left_post l pos j ->
+  match_inv (pos + p).
 Proof.
   intros Hj. intros.
   destruct H0. destruct H1. 
   destruct H3. destruct H4.
   clear Hnpm_mrp0.
-  constructor; [lia | lia | |].
-  - (* 证明前缀s的匹配 *)
-    replace (pos + p + (Zlength patn - p)) with (pos + Zlength patn) by lia.
-    assert (Zsublist 0 (Zlength patn - p) patn = Zsublist p (Zlength patn) patn).
-    { apply (periodic_segment' default _ p 1); auto; try lia.
-      destruct Hp0. auto. }
-    rewrite H0.
-    apply (f_equal(fun lx => Zsublist (p - l) (Zlength patn - l) lx)) in Hpm_mrp0.
-    rewrite Zsublist_Zsublist in Hpm_mrp0; try lia.
-    rewrite Zsublist_Zsublist in Hpm_mrp0; try lia.
-    replace (p - l + l) with p in Hpm_mrp0 by lia.
-    replace (Zlength patn - l + l) with (Zlength patn) in Hpm_mrp0 by lia.
-    replace (p - l + (pos + l)) with (pos + p) in Hpm_mrp0 by lia.
-    replace (Zlength patn - l + (pos + l)) with (pos + Zlength patn) in Hpm_mrp0 by lia.
-    apply Hpm_mrp0.
-  - (* 证明no_occur *)
-    unfold no_occur. intros t ?.
-    destruct (Z.lt_trichotomy t pos) as [Hlt | [Heq | Hgt]].
-    + apply Hnoc0. lia.
-    + subst t. intros Hnot.
-      apply (f_equal(fun lx => Znth j lx default)) in Hnot.
-      assert (j < 0 \/ 0 <= j) by lia.
-      destruct H1.
-      * rewrite (Znth_neg_iff_Znth_zero j) in Hnot; try lia.
-      * rewrite Znth_Zsublist in Hnot; try lia.
-        replace (j + pos) with (pos + j) in Hnot by lia.
-        symmetry in Hnot.
-        destruct Hnpm_mlp0; contradiction.
-    + intros Hnot.
-      assert (local_period l (t - pos)).
-      { unfold local_period.
-        split; [|split]; try lia. intros.
-        assert (l + (t - pos) <= Zlength patn \/ l + (t - pos) > Zlength patn) by lia.
-        assert (0 <= l - (t -pos) \/ l - (t - pos) < 0) by lia.
-        destruct H5; destruct H6. (* 分别讨论左右是否长度足够 *)
-        - (* 正常长度版本 *)
-          assert (Zsublist l (l + (t - pos)) patn = Zsublist (pos + l) (t + l) text).
-          { apply (f_equal (fun lx => Zsublist 0 (t - pos) lx)) in Hpm_mrp0.
-            rewrite Zsublist_Zsublist in Hpm_mrp0; try lia.
-            rewrite Zsublist_Zsublist in Hpm_mrp0; try lia.
-            simpl in Hpm_mrp0.
-            replace (t - pos + l) with (l + (t - pos)) in Hpm_mrp0 by lia.
-            replace (t - pos + (pos + l)) with (t + l) in Hpm_mrp0 by lia.
-            apply Hpm_mrp0. }
-          assert (Zsublist (l - (t - pos)) l patn = Zsublist (pos + l) (t + l) text).
-          { apply (f_equal (fun lx => Zsublist (l - (t - pos)) l lx)) in Hnot.
-            rewrite Zsublist_Zsublist in Hnot; try lia.
-            replace (l - (t - pos) + t) with (pos + l) in Hnot by lia.
-            replace (l + t) with (t + l) in Hnot by lia.
-            symmetry. apply Hnot. }
-          rewrite <- H7 in H8.
-          apply (f_equal (fun lx => Znth i lx default)) in H8.
-          rewrite Znth_Zsublist in H8; try lia.
-          rewrite Znth_Zsublist in H8; try lia.
-          replace (i + (l - (t - pos))) with (l + i - (t - pos)) in H8 by lia.
-          replace (i + l) with (l + i) in H8 by lia.
-          apply H8.
-        - (* 左侧长度不够 *)
-          assert (Zsublist (t - pos) (l + (t - pos)) patn = Zsublist t (t + l) text).
-          { apply (f_equal(fun lx => Zsublist (t - pos - l) (t - pos) lx)) in Hpm_mrp0.
-            rewrite Zsublist_Zsublist in Hpm_mrp0; try lia.
-            rewrite Zsublist_Zsublist in Hpm_mrp0; try lia.
-            replace (t - pos - l + l) with (t - pos) in Hpm_mrp0 by lia.
-            replace (t - pos + l) with (l + (t - pos)) in Hpm_mrp0 by lia.
-            replace (t - pos - l + (pos + l)) with t in Hpm_mrp0 by lia. (* 我觉得需要一个简单的全自动replace的小战术🤔 *)
-            replace (t - pos + (pos + l)) with (t + l) in Hpm_mrp0 by lia.
-            apply Hpm_mrp0. }
-          assert (Zsublist 0 l patn = Zsublist t (t + l) text).
-          { apply (f_equal(fun lx => Zsublist 0 l lx)) in Hnot.
-            rewrite Zsublist_Zsublist in Hnot; try lia.
-            simpl in Hnot. 
-            replace (l + t) with (t + l) in Hnot by lia.
-            symmetry. apply Hnot. }
-          rewrite <- H7 in H8.
-          apply (f_equal (fun lx => Znth (l + i - (t - pos)) lx default)) in H8.
-          rewrite Znth_Zsublist in H8; try lia.
-          rewrite Znth_Zsublist in H8; try lia.
-          replace (l + i - (t - pos) + 0) with (l + i - (t - pos)) in H8 by lia.
-          replace (l + i - (t - pos) + (t - pos)) with (l + i) in H8 by lia.
-          apply H8.
-        - (* 右侧长度不够 *)
-          assert (Zsublist l (Zlength patn) patn = Zsublist (pos + l) (pos + Zlength patn) text).
-          { apply (f_equal(fun lx => Zsublist 0 (Zlength patn - l) lx)) in Hpm_mrp0.
-            rewrite Zsublist_Zsublist in Hpm_mrp0; try lia.
-            rewrite Zsublist_Zsublist in Hpm_mrp0; try lia.
-            simpl in Hpm_mrp0.
-            replace (Zlength patn - l + l) with (Zlength patn) in Hpm_mrp0 by lia.
-            replace (Zlength patn - l + (pos + l)) with (pos + Zlength patn) in Hpm_mrp0 by lia.
-            apply Hpm_mrp0. }
-          assert (Zsublist (l - (t - pos)) (Zlength patn - (t - pos)) patn = Zsublist (pos + l) (pos + Zlength patn) text).
-          { apply (f_equal(fun lx => Zsublist (l - (t - pos)) (Zlength patn - (t - pos)) lx)) in Hnot.
-            rewrite Zsublist_Zsublist in Hnot; try lia.
-            replace (l - (t - pos) + t) with (pos + l) in Hnot by lia.
-            replace (Zlength patn - (t - pos) + t)  with (pos + Zlength patn) in Hnot by lia.
-            symmetry. apply Hnot. }
-          rewrite <- H7 in H8.
-          apply (f_equal(fun lx => Znth i lx default)) in H8.
-          rewrite Znth_Zsublist in H8; try lia.
-          rewrite Znth_Zsublist in H8; try lia.
-          replace (i + (l - (t - pos))) with (l + i - (t - pos)) in H8 by lia.
-          replace (i + l) with (l + i) in H8 by lia.
-          apply H8.
-        - (* 两侧长度都不够 *)
-          assert (Zsublist (t - pos) (Zlength patn) patn = Zsublist t (pos + Zlength patn) text).
-          { apply (f_equal(fun lx => Zsublist (t - pos - l) (Zlength patn - l) lx)) in Hpm_mrp0.
-            rewrite Zsublist_Zsublist in Hpm_mrp0; try lia.
-            rewrite Zsublist_Zsublist in Hpm_mrp0; try lia.
-            replace (t - pos - l + l) with (t - pos) in Hpm_mrp0 by lia.
-            replace (Zlength patn - l + l) with (Zlength patn) in Hpm_mrp0 by lia.
-            replace (t - pos - l + (pos + l)) with t in Hpm_mrp0 by lia.
-            replace (Zlength patn - l + (pos + l)) with (pos + Zlength patn) in Hpm_mrp0 by lia.
-            apply Hpm_mrp0. }
-          assert (Zsublist 0 (Zlength patn - (t - pos)) patn = Zsublist t (pos + Zlength patn) text).
-          { apply (f_equal(fun lx => Zsublist 0 (Zlength patn - (t - pos)) lx)) in Hnot.
-            rewrite Zsublist_Zsublist in Hnot; try lia.
-            simpl in Hnot.
-            replace (Zlength patn - (t - pos) + t) with (pos + Zlength patn) in Hnot by lia.
-            symmetry. apply Hnot. }
-          rewrite <- H7 in H8.
-          apply (f_equal(fun lx => Znth (l + i - (t - pos)) lx default)) in H8.
-          rewrite Znth_Zsublist in H8; try lia.
-          rewrite Znth_Zsublist in H8; try lia.
-          replace (l + i - (t - pos) + 0) with (l + i - (t - pos)) in H8 by lia.
-          replace (l + i - (t - pos) + (t - pos)) with (l + i) in H8 by lia.
-          apply H8.
-      }
-      unfold min_local_period in Hcp0.
-      destruct Hcp0 as [Hcp0 Hcp1].
-      pose proof Hcp1 (t - pos) H1.
-      lia. (* 与最小局部周期的矛盾 *)
+  constructor; [lia | ].
+  unfold no_occur. intros t ?.
+  destruct (Z.lt_trichotomy t pos) as [Hlt | [Heq | Hgt]].
+  + apply Hnoc0. lia.
+  + subst t. intros Hnot.
+    apply (f_equal(fun lx => Znth j lx default)) in Hnot.
+    assert (j < 0 \/ 0 <= j) by lia.
+    destruct H1.
+    * rewrite (Znth_neg_iff_Znth_zero j) in Hnot; try lia.
+    * rewrite Znth_Zsublist in Hnot; try lia.
+      replace (j + pos) with (pos + j) in Hnot by lia.
+      symmetry in Hnot.
+      destruct Hnpm_mlp0; contradiction.
+  + intros Hnot.
+    assert (local_period l (t - pos)).
+    { unfold local_period.
+      split; [|split]; try lia. intros.
+      assert (l + (t - pos) <= Zlength patn \/ l + (t - pos) > Zlength patn) by lia.
+      assert (0 <= l - (t -pos) \/ l - (t - pos) < 0) by lia.
+      destruct H5; destruct H6. (* 分别讨论左右是否长度足够 *)
+      - (* 正常长度版本 *)
+        assert (Zsublist l (l + (t - pos)) patn = Zsublist (pos + l) (t + l) text).
+        { apply (f_equal (fun lx => Zsublist 0 (t - pos) lx)) in Hpm_mrp0.
+          rewrite Zsublist_Zsublist in Hpm_mrp0; try lia.
+          rewrite Zsublist_Zsublist in Hpm_mrp0; try lia.
+          simpl in Hpm_mrp0.
+          replace (t - pos + l) with (l + (t - pos)) in Hpm_mrp0 by lia.
+          replace (t - pos + (pos + l)) with (t + l) in Hpm_mrp0 by lia.
+          apply Hpm_mrp0. }
+        assert (Zsublist (l - (t - pos)) l patn = Zsublist (pos + l) (t + l) text).
+        { apply (f_equal (fun lx => Zsublist (l - (t - pos)) l lx)) in Hnot.
+          rewrite Zsublist_Zsublist in Hnot; try lia.
+          replace (l - (t - pos) + t) with (pos + l) in Hnot by lia.
+          replace (l + t) with (t + l) in Hnot by lia.
+          symmetry. apply Hnot. }
+        rewrite <- H7 in H8.
+        apply (f_equal (fun lx => Znth i lx default)) in H8.
+        rewrite Znth_Zsublist in H8; try lia.
+        rewrite Znth_Zsublist in H8; try lia.
+        replace (i + (l - (t - pos))) with (l + i - (t - pos)) in H8 by lia.
+        replace (i + l) with (l + i) in H8 by lia.
+        apply H8.
+      - (* 左侧长度不够 *)
+        assert (Zsublist (t - pos) (l + (t - pos)) patn = Zsublist t (t + l) text).
+        { apply (f_equal(fun lx => Zsublist (t - pos - l) (t - pos) lx)) in Hpm_mrp0.
+          rewrite Zsublist_Zsublist in Hpm_mrp0; try lia.
+          rewrite Zsublist_Zsublist in Hpm_mrp0; try lia.
+          replace (t - pos - l + l) with (t - pos) in Hpm_mrp0 by lia.
+          replace (t - pos + l) with (l + (t - pos)) in Hpm_mrp0 by lia.
+          replace (t - pos - l + (pos + l)) with t in Hpm_mrp0 by lia. (* 我觉得需要一个简单的全自动replace的小战术🤔 *)
+          replace (t - pos + (pos + l)) with (t + l) in Hpm_mrp0 by lia.
+          apply Hpm_mrp0. }
+        assert (Zsublist 0 l patn = Zsublist t (t + l) text).
+        { apply (f_equal(fun lx => Zsublist 0 l lx)) in Hnot.
+          rewrite Zsublist_Zsublist in Hnot; try lia.
+          simpl in Hnot. 
+          replace (l + t) with (t + l) in Hnot by lia.
+          symmetry. apply Hnot. }
+        rewrite <- H7 in H8.
+        apply (f_equal (fun lx => Znth (l + i - (t - pos)) lx default)) in H8.
+        rewrite Znth_Zsublist in H8; try lia.
+        rewrite Znth_Zsublist in H8; try lia.
+        replace (l + i - (t - pos) + 0) with (l + i - (t - pos)) in H8 by lia.
+        replace (l + i - (t - pos) + (t - pos)) with (l + i) in H8 by lia.
+        apply H8.
+      - (* 右侧长度不够 *)
+        assert (Zsublist l (Zlength patn) patn = Zsublist (pos + l) (pos + Zlength patn) text).
+        { apply (f_equal(fun lx => Zsublist 0 (Zlength patn - l) lx)) in Hpm_mrp0.
+          rewrite Zsublist_Zsublist in Hpm_mrp0; try lia.
+          rewrite Zsublist_Zsublist in Hpm_mrp0; try lia.
+          simpl in Hpm_mrp0.
+          replace (Zlength patn - l + l) with (Zlength patn) in Hpm_mrp0 by lia.
+          replace (Zlength patn - l + (pos + l)) with (pos + Zlength patn) in Hpm_mrp0 by lia.
+          apply Hpm_mrp0. }
+        assert (Zsublist (l - (t - pos)) (Zlength patn - (t - pos)) patn = Zsublist (pos + l) (pos + Zlength patn) text).
+        { apply (f_equal(fun lx => Zsublist (l - (t - pos)) (Zlength patn - (t - pos)) lx)) in Hnot.
+          rewrite Zsublist_Zsublist in Hnot; try lia.
+          replace (l - (t - pos) + t) with (pos + l) in Hnot by lia.
+          replace (Zlength patn - (t - pos) + t)  with (pos + Zlength patn) in Hnot by lia.
+          symmetry. apply Hnot. }
+        rewrite <- H7 in H8.
+        apply (f_equal(fun lx => Znth i lx default)) in H8.
+        rewrite Znth_Zsublist in H8; try lia.
+        rewrite Znth_Zsublist in H8; try lia.
+        replace (i + (l - (t - pos))) with (l + i - (t - pos)) in H8 by lia.
+        replace (i + l) with (l + i) in H8 by lia.
+        apply H8.
+      - (* 两侧长度都不够 *)
+        assert (Zsublist (t - pos) (Zlength patn) patn = Zsublist t (pos + Zlength patn) text).
+        { apply (f_equal(fun lx => Zsublist (t - pos - l) (Zlength patn - l) lx)) in Hpm_mrp0.
+          rewrite Zsublist_Zsublist in Hpm_mrp0; try lia.
+          rewrite Zsublist_Zsublist in Hpm_mrp0; try lia.
+          replace (t - pos - l + l) with (t - pos) in Hpm_mrp0 by lia.
+          replace (Zlength patn - l + l) with (Zlength patn) in Hpm_mrp0 by lia.
+          replace (t - pos - l + (pos + l)) with t in Hpm_mrp0 by lia.
+          replace (Zlength patn - l + (pos + l)) with (pos + Zlength patn) in Hpm_mrp0 by lia.
+          apply Hpm_mrp0. }
+        assert (Zsublist 0 (Zlength patn - (t - pos)) patn = Zsublist t (pos + Zlength patn) text).
+        { apply (f_equal(fun lx => Zsublist 0 (Zlength patn - (t - pos)) lx)) in Hnot.
+          rewrite Zsublist_Zsublist in Hnot; try lia.
+          simpl in Hnot.
+          replace (Zlength patn - (t - pos) + t) with (pos + Zlength patn) in Hnot by lia.
+          symmetry. apply Hnot. }
+        rewrite <- H7 in H8.
+        apply (f_equal(fun lx => Znth (l + i - (t - pos)) lx default)) in H8.
+        rewrite Znth_Zsublist in H8; try lia.
+        rewrite Znth_Zsublist in H8; try lia.
+        replace (l + i - (t - pos) + 0) with (l + i - (t - pos)) in H8 by lia.
+        replace (l + i - (t - pos) + (t - pos)) with (l + i) in H8 by lia.
+        apply H8.
+    }
+    unfold min_local_period in Hcp0.
+    destruct Hcp0 as [Hcp0 Hcp1].
+    pose proof Hcp1 (t - pos) H1.
+    lia. (* 与最小局部周期的矛盾 *)
 Qed.
 
-Lemma match_proof_continue (l p pos s : Z): 
+Lemma match_proof_continue (l p pos : Z): 
   patn <> nil ->
   crit_factor_prop l p ->
-  match_inv pos s -> 
+  match_inv pos -> 
   Hoare
-    (loop_body l p (pos, s))
+    (loop_body l p pos)
     match_inv_continue.
 Proof.
   intros.
@@ -1353,27 +1318,27 @@ Proof.
   hoare_auto.
   2:{ unfold match_inv_continue. easy. }
   apply Hoare_bind with (P := match_right_post l pos).
-  1:{ apply (match_right_prop l p pos s); auto. }
+  1:{ apply (match_right_prop l p pos); auto. }
   intros j H3.
   hoare_auto. (* 右侧失配证明完毕 *)
-  2:{ apply (match_inv_continue_right l p pos s); auto; try lia. }
-  apply Hoare_bind with (P := match_left_post l pos s); subst j. (* 把右侧匹配的结果 j = Zlength patn 代入 *)
-  1:{ apply (match_left_prop l p pos s); auto. } (* 左侧的Prop用了一点右侧匹配的结论，MARK无奈 *)
+  2:{ apply (match_inv_continue_right l p pos); auto; try lia. }
+  apply Hoare_bind with (P := match_left_post l pos); subst j. (* 把右侧匹配的结果 j = Zlength patn 代入 *)
+  1:{ apply (match_left_prop l p pos); auto. } (* 左侧的Prop用了一点右侧匹配的结论，MARK无奈 *)
   intros j' ?. hoare_auto; simpl.
   - tauto.
-  - apply (match_inv_continue_left l p pos s j'); auto.
+  - apply (match_inv_continue_left l p pos j'); auto.
 Qed.
 
-Definition match_post_break (a : CntOrBrk (Z * Z) (option Z)) : Prop :=
+Definition match_post_break (a : CntOrBrk Z (option Z)) : Prop :=
   match a with
   | by_continue x => True
   | by_break x =>  match_post x
   end.
 
-Lemma Zlength_overflow_NotFound (l p pos s : Z):
+Lemma Zlength_overflow_NotFound (l p pos : Z):
   patn <> nil ->
   crit_factor_prop l p ->
-  match_inv pos s ->
+  match_inv pos ->
   pos + Zlength patn > Zlength text ->
   no_occur (Zlength text).
 Proof.
@@ -1390,14 +1355,14 @@ Proof.
     rewrite Zlength_Zsublist in Hnot; try lia. (* 长度不相等的矛盾 *)
 Qed.
 
-Lemma first_occur_break (l p pos s j: Z):
+Lemma first_occur_break (l p pos j: Z):
   patn <> nil ->
   crit_factor_prop l p ->
-  match_inv pos s ->
+  match_inv pos ->
   pos + Zlength patn <= Zlength text ->
   match_right_post l pos (Zlength patn) ->
-  match_left_post l pos s j ->
-  j < s ->
+  match_left_post l pos j ->
+  j < 0 ->
   first_occur pos.
 Proof.
   intros.
@@ -1408,26 +1373,14 @@ Proof.
   assert (0 <= j \/ j < 0) by lia.
   destruct H0.
   - assert (Zsublist 0 (j + 1) patn = Zsublist pos (pos + j + 1) text).
-    { apply (f_equal (fun lx => Zsublist 0 (j + 1) lx)) in Hmem0.
-      rewrite Zsublist_Zsublist in Hmem0; try lia.
-      rewrite Zsublist_Zsublist in Hmem0; try lia.
-      simpl in Hmem0. 
-      replace (j + 1 + 0) with (j + 1) in Hmem0 by lia.
-      replace (j + 1 + pos) with (pos + j + 1) in Hmem0 by lia.
-      apply Hmem0. }
+    { assert (j + 1 <= 0) by lia.
+      repeat rewrite Zsublist_nil; try lia. }
     assert (patn = Zsublist 0 (Zlength patn) patn).
     { replace patn with (patn ++ nil) at 3. 
       2:{ rewrite app_nil_r. reflexivity. }
       rewrite Zsublist_app_exact1. reflexivity. }
     rewrite H3 at 2.
     rewrite (Zsublist_split pos _ (pos + j + 1)); try lia.
-    rewrite (Zsublist_split (pos + j + 1) _ (pos + l)); try lia.
-    rewrite (Zsublist_split 0 _ (j + 1)); try lia.
-    rewrite (Zsublist_split (j + 1) _ l); try lia.
-    rewrite H1.
-    rewrite Hpm_mlp0.
-    rewrite Hpm_mrp0.
-    reflexivity. (* 拆分为 --- j --- l --- 三段分别完成匹配 *)
   - assert (j = -1 \/ j < -1) by lia.
     destruct H1.
     + subst j.
@@ -1444,27 +1397,27 @@ Proof.
     + (* 不可能存在 *) lia. (* 因为在match_left_inv 中证明了j至少为 -1 哦 *)
 Qed.
 
-Lemma match_proof_break (l p pos s : Z): 
+Lemma match_proof_break (l p pos : Z): 
   patn <> nil ->
   crit_factor_prop l p ->
-  match_inv pos s -> 
+  match_inv pos -> 
   Hoare
-    (loop_body l p (pos, s))
+    (loop_body l p pos)
     match_post_break.
 Proof.
   intros.
   unfold loop_body.
   hoare_auto. (* 继续剥洋葱 *)
-  2:{ simpl. apply (Zlength_overflow_NotFound l p pos s); auto. }
+  2:{ simpl. apply (Zlength_overflow_NotFound l p pos); auto. }
   apply Hoare_bind with (P := match_right_post l pos).
-  1:{ apply (match_right_prop l p pos s); auto. }
+  1:{ apply (match_right_prop l p pos); auto. }
   intros j H3.
   hoare_auto.
   2:{ simpl. tauto. }
-  apply Hoare_bind with (P := match_left_post l pos s); subst j. (* 把右侧匹配的结果 j = Zlength patn 代入 *)
-  1:{ apply (match_left_prop l p pos s); auto. } (* 左侧的Prop用了一点右侧匹配的结论，MARK无奈 *)
+  apply Hoare_bind with (P := match_left_post l pos); subst j. (* 把右侧匹配的结果 j = Zlength patn 代入 *)
+  1:{ apply (match_left_prop l p pos); auto. } (* 左侧的Prop用了一点右侧匹配的结论，MARK无奈 *)
   intros j' ?. hoare_auto; simpl.
-  - apply (first_occur_break l p pos s j'); auto.
+  - apply (first_occur_break l p pos j'); auto.
   - tauto.
 Qed.
 
@@ -1488,19 +1441,41 @@ Proof.
   eapply Hoare_bind.
   2:{ intros. apply Hoare_ret. apply H1. }
   unfold match_algo. (* 正式进入match_algo *)
-  apply Hoare_repeat_break with (P := fun '(pos,s) => match_inv pos s).
+  apply Hoare_repeat_break with (P := fun pos => match_inv pos).
   3:{ apply match_inv_init; auto. }
-  - intros. destruct a as [pos s].
+  - intros pos Hinv.
     apply Hoare_bind with (P := match_inv_continue).
     2:{ intros. destruct a.
         - apply Hoare_ret.
-          apply H2.
+          simpl in H1. apply H1.
         - apply Hoare_empty. }
-    apply (match_proof_continue l p pos s); auto.
-  - intros. destruct a as [pos s].
+    apply (match_proof_continue l p pos); auto.
+  - intros pos Hinv.
     apply Hoare_bind with (P := match_post_break).
     2:{ intros. destruct a; hoare_auto. }
-    apply (match_proof_break l p pos s); auto.
+    apply (match_proof_break l p pos); auto.
+Qed.
+
+Theorem match_algo_correct (l p : Z): 
+  patn <> nil ->
+  crit_factor_prop l p ->
+  Hoare (match_algo l p) match_post.
+Proof.
+  intros.
+  unfold match_algo. (* 正式进入match_algo *)
+  apply Hoare_repeat_break with (P := fun pos => match_inv pos).
+  3:{ apply match_inv_init; auto. }
+  - intros pos Hinv.
+    apply Hoare_bind with (P := match_inv_continue).
+    2:{ intros. destruct a.
+        - apply Hoare_ret.
+          simpl in H1. apply H1.
+        - apply Hoare_empty. }
+    apply (match_proof_continue l p pos); auto.
+  - intros pos Hinv.
+    apply Hoare_bind with (P := match_post_break).
+    2:{ intros. destruct a; hoare_auto. }
+    apply (match_proof_break l p pos); auto.
 Qed.
 
 End match_algo_proof.

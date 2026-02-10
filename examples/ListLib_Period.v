@@ -17,7 +17,7 @@ Section list_period_lemma.
 (* MARK: 周期的定义和长度的关系 *)
 Definition is_period {A : Type} (default : A) (l : list A) (p : Z) : Prop :=
   0 < p /\
-  (forall (i : Z), 
+  (forall (i : Z),
     0 <= i -> (* SRAR : 改成Z需要注意更多范围约束 *)
     i + p < Zlength l ->
     Znth i l default = Znth (i + p) l default).
