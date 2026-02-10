@@ -4,6 +4,9 @@ This repository contains the artifact accompanying an anonymous submission
 under double-blind review. It includes mechanized Coq developments for
 specifying and verifying the two-way string matching algorithm.
 
+
+All key proofs have been completed, and we will finalize the remaining refinements, including comments and naming, by February 11.
+
 ## Code Structure
 
 Directories/files denoted with `*` are dependencies or auxiliary libraries
