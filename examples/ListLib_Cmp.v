@@ -138,6 +138,11 @@ Lemma proper_prefix_discriminate_gt_ex' (cmp_fn : A -> A -> comparison) (l1 l2 :
   is_proper_prefix l1 l2 -> False.
 Proof. Admitted.
 
+Lemma ge_discriminate_gt (cmp_fn : A -> A -> comparison) (l1 l2 : list A): 
+  list_lex_ge cmp_fn l1 l2 ->
+  list_lex_gt cmp_fn l2 l1 -> False.
+Proof. Admitted.
+
 Lemma list_lex_gt_ex_trans (cmp_fn : A -> A -> comparison):
   forall l1 l2 l3,
     list_lex_gt_ex cmp_fn l1 l2 ->

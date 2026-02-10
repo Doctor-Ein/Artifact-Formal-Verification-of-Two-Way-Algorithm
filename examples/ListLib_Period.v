@@ -45,6 +45,25 @@ Definition is_minimal_period {A : Type} (default : A) (l : list A) (p : Z) : Pro
   is_period default l p /\ 
     forall (p' : Z), is_period default l p' -> p' >= p.
 
+Lemma minimal_period_le_Zlength {A : Type} (default : A) (l : list A) (p : Z):
+  l <> nil ->
+  is_minimal_period default l p ->
+  p <= Zlength l.
+Proof.
+  intros.
+  destruct H0.
+  assert (is_period default l (Zlength l)).
+  { unfold is_period.
+    split.
+    - pose proof Zlength_nonneg l.
+      assert (0 < Zlength l \/ Zlength l = 0) by lia.
+      destruct H3; [auto|].
+      apply Zlength_zero_iff_nil in H3. contradiction.
+    - intros. lia. }
+  specialize (H1 (Zlength l) H2).
+  lia.
+Qed.
+
 Definition border {A : Type} (l l1 : list A) : Prop :=
   is_prefix l1 l /\ is_suffix l1 l.
 
@@ -97,6 +116,61 @@ Proof.
   apply Zsublist_prefix_range in H'.
   2:{ split; [split|]; try lia. apply Zlength_nonneg. }
   apply H1; try lia.
+Qed.
+
+Lemma suffix_contains_period {A : Type} (default : A) (l l1 : list A) (p: Z):
+  is_suffix l1 l ->
+  is_period default l p ->
+  is_period default l1 p.
+Proof.
+  unfold is_suffix. intros.
+  destruct H0.
+  rewrite <- (Zsublist_all l) in H.
+  pose proof H as H'.
+  apply Zsublist_suffix_inv in H.
+  2:{ split; [split|]; try lia. apply Zlength_nonneg. }
+  split; [auto|]. 
+  rewrite H. 
+  pose proof Zlength_nonneg l.
+  pose proof Zlength_nonneg l1.
+  apply Zsublist_suffix_range in H'; try lia.
+  rewrite Zlength_Zsublist; try lia.
+  intros.
+  rewrite Znth_Zsublist; try lia.
+  rewrite Znth_Zsublist; try lia.
+  specialize (H1 (i + (Zlength l - Zlength l1)) ltac:(lia) ltac:(lia)).
+  replace (i + p + (Zlength l - Zlength l1)) with (i + (Zlength l - Zlength l1) + p) by lia.
+  apply H1.
+Qed.
+
+(* 这里设计的也不太好，其实不是presuffix，而是sublist的包含 *)
+Lemma suffix_less_period {A : Type} (default : A) (l1 l2 : list A) (p1 p2 : Z):
+  is_suffix l2 l1 ->
+  is_minimal_period default l1 p1 ->
+  is_minimal_period default l2 p2 ->
+  p2 <= p1.
+Proof.
+  intros.
+  destruct H0. destruct H1.
+  pose proof Zlength_nonneg l1.
+  pose proof Zlength_nonneg l2.
+  assert (is_period default l2 p1).
+  { destruct H0.
+    unfold is_period.
+    split; [lia|]; intros.
+    rewrite <- (Zsublist_all l1) in H.
+    pose proof H as H'.
+    apply Zsublist_suffix_inv in H; try lia.
+    apply Zsublist_suffix_range in H'; try lia.
+    specialize (H6 (i + Zlength l1 - Zlength l2) ltac:(lia) ltac:(lia)).
+    rewrite H.
+    repeat rewrite Znth_Zsublist; try lia.
+    replace (i + (Zlength l1 - Zlength l2)) with (i + Zlength l1 - Zlength l2) by lia.
+    replace (i + p1 + (Zlength l1 - Zlength l2)) with (i + Zlength l1 - Zlength l2 + p1) by lia.
+    apply H6.
+  }
+  specialize (H3 p1 H6).
+  lia.
 Qed.
 
 Lemma is_period_spec_repeat_twice {A : Type} (default : A) (l : list A) (p : Z): 

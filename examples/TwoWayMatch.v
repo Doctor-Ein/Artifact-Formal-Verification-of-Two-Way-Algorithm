@@ -36,7 +36,7 @@ Definition cmp_rev : A -> A -> comparison :=
 
 Parameter mp : Z.
 Axiom mp_existence : is_minimal_period default patn mp. (* 假设全局周期的逻辑存在性 *)
-Axiom mp_range : mp <= Zlength patn.
+Axiom mp_range : 0 < mp <= Zlength patn.
 
 Section critical_factorization_theorem.
 
@@ -821,7 +821,7 @@ Qed.
 (* TODO : 从maximal suffix算法来的证明连接 *)
 Record crit_factor_prop (l p : Z): Prop := {
   Hrange_lp : 0 <= l < mp /\ mp <= Zlength patn; (* 这里关键分解位置小于p 也需要证明TODO *)
-  Hp : 0 <= p <= mp;
+  Hp : 0 < p <= mp;
   Hcp: min_local_period l mp; (* 全局周期等于关键分解处的最小局部周期 *)
 }.
 
