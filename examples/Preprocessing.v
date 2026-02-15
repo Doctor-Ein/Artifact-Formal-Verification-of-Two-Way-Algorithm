@@ -89,21 +89,42 @@ Definition periodicity (i j k p : Z) : Prop :=
     Znth t patn default = Znth (t + p) patn default.
 
 Lemma periodicity_ext (i j k p t z: Z):
+  (0 <= p) ->
   (periodicity i j k p) -> 
   (i <= t) -> 
+  (0 <= z) ->
   (t + z * p < j + k) ->
   (Znth t patn default = Znth (t + z * p) patn default).
-Proof. Admitted.
+Proof.
+  intros.
+  set (n := Z.to_nat z).
+  replace z with (Z.of_nat n) in * by lia.
+  induction n.
+  - simpl.
+    replace (t + 0) with t by lia.
+    reflexivity.
+  - rewrite Nat2Z.inj_succ.
+    replace (t + Z.succ (Z.of_nat n) * p) with
+            (t + Z.of_nat n * p + p) by lia.
+    pose proof H1 (t + Z.of_nat n * p).
+    assert (i <= t + Z.of_nat n * p) by lia.
+    assert (t + Z.of_nat n * p + p < j + k) by lia.
+    pose proof H5 H6 H7.
+    rewrite <- H8.
+    apply IHn; try lia.
+Qed.
 
 Lemma periodicity_ext' (i j k p z t1 t2 : Z):
+  (0 <= p) ->
   (periodicity i j k p) -> 
   (i <= t1) ->
+  (0 <= z) ->
   (t2 < j + k) ->
   (t2 = t1 + z * p) ->
   (Znth t1 patn default = Znth t2 patn default).
 Proof.
   intros.
-  rewrite H3.
+  rewrite H5.
   apply (periodicity_ext i j k p t1 z); auto; try lia.
 Qed.
 
@@ -273,6 +294,7 @@ Lemma periodic_extension (i j k p z lo hi lo' hi' : Z):
     (j + k <= Zlength patn) ->
     (0 <= i < j) ->
     (z >= 0) ->
+    (0 <= p) ->
     (periodicity i j k p) ->
     (i <= lo /\ hi <= j + k) ->
     (i <= lo' /\ hi' <= j + k) ->
@@ -281,14 +303,14 @@ Lemma periodic_extension (i j k p z lo hi lo' hi' : Z):
     (hi - lo = hi' - lo') ->
     (Zsublist lo hi patn = Zsublist lo' hi' patn).
 Proof.
-  intros. destruct H4; destruct H5.
+  intros. destruct H5; destruct H6.
   apply (list_eq_ext _ _ default).
   split.
   - repeat rewrite Zlength_Zsublist; try lia.
   - intros t ?.
-    rewrite Zlength_Zsublist in H11; try lia.
+    rewrite Zlength_Zsublist in H12; try lia.
     repeat rewrite Znth_Zsublist; try lia.
-    rewrite H7.
+    rewrite H8.
     replace (t + (lo + z * p)) with (t + lo + z * p) by lia.
     set (i' := t + lo).
     eapply (periodicity_ext' i j k p z); auto; try lia.
@@ -587,6 +609,7 @@ Proof.
     rewrite H4. rewrite H5.
     assert (t = i + k + (z - 1) * p) by lia.
     rewrite H7. symmetry.
+    assert (0 <= z - 1) by nia.
     apply (periodicity_ext' i j k p (z - 1)); auto; try lia.
 Qed.
 
@@ -1002,7 +1025,8 @@ Proof.
       apply Hper0. lia.
     } clear Hper0.
     assert (Zsublist i (i + p - p') patn = Zsublist (i + p') (i + p) patn).
-    { apply (periodic_extension i j k p' 1); auto; try nia. }
+    { apply (periodic_extension i j k p' 1); auto; try nia.
+       }
     specialize (Hopt2 (i + p') ltac:(lia)).
     assert (is_proper_prefix (Zsublist ((i + p')) ((i + p)) patn) (Zsublist (i) ((i + p)) patn)).
     { unfold is_proper_prefix.
