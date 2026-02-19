@@ -10,7 +10,7 @@ Require Import ListLib.General.Length.
 Require Import Examples.ListLib_Extend.
 Require Import Examples.ListLib_Period.
 Require Import Examples.ListLib_Cmp.
-Require Import Orders. (* 这里引入comparison *)
+Require Import Orders. (* Import comparison ordering *)
 From MonadLib.SetMonad Require Import SetBasic SetHoare.
 Import ListNotations.
 Import SetsNotation.
@@ -26,7 +26,7 @@ Context (patn : list A).
 Context (cmp_fn : A -> A -> comparison).
 Context `{Cmp cmp_fn}.
 
-(* 利用SetMonad定义body TODO: 所有英文的翻译 *)
+(* Define the body using SetMonad; TODO: ensure all English phrasing *)
 Definition maxsuf_cal_body (s : Z * Z * Z * Z) :
   program (CntOrBrk (Z * Z * Z * Z) (Z * Z)) :=
   let '(i, j, k, p) := s in
@@ -53,9 +53,9 @@ Definition maxsuf_cal_body (s : Z * Z * Z * Z) :
 
 Definition maxsuf_cal: program (Z * Z) :=
   res <- repeat_break maxsuf_cal_body (0, 1, 0, 1);; ret res.
-(* 约定：以i表示后缀patn[i+0, i+1,..., n]，k从0开始*)
+(* Convention: i denotes suffix patn[i+0, i+1, ..., n]; k starts at 0 *)
 
-(* TODO 迁移到ListLib_Extend *)
+(* TODO: move to ListLib_Extend *)
 Definition skipn' (i : Z) (l : list A): list A :=
   Zsublist i (Zlength l) l.
 
@@ -64,7 +64,7 @@ Definition is_maximal_suffix (pos : Z) : Prop :=
     forall i', 0 <= i' <= Zlength patn ->
     list_lex_ge cmp_fn (skipn' pos patn) (skipn' i' patn).
 
-(* 以下具体定义不变式 *)
+(* Define the loop invariants *)
 Record var_range (i j k p : Z) : Prop := {
   range_ij : 0 <= i < j;
   range_kp : 0 <= k < p;
@@ -75,7 +75,7 @@ Definition optimality (i j k p : Z) : Prop :=
   forall i', 0 <= i' < i ->
     list_lex_gt cmp_fn (skipn' i patn) (skipn' i' patn).
 
-(* 左闭右开 patn[i, i+k) = patn[j,j+k) *)
+(* Half-open interval equality: patn[i, i+k) = patn[j, j+k) *)
 Definition partial_match (i j k p : Z) : Prop :=
   Zsublist i (i + k) patn = Zsublist j (j + k) patn.
 
@@ -128,7 +128,7 @@ Qed.
 Definition optimality2 (i j k p : Z) : Prop :=
   forall t, i < t < i + p ->
       list_lex_gt_ex cmp_fn (Zsublist i (i + p) patn) (Zsublist t (i + p) patn).
-(* 体现一个周期，一般以前缀关系来使用 *)
+(* Capture one-period behavior, typically used via prefix relations *)
 
 Record maxsuf_inv (i j k p : Z) : Prop := {
   Hrange : var_range i j k p;
@@ -186,14 +186,14 @@ Lemma periodicity_init :
 Proof.
   unfold periodicity.
   intros.
-  lia. (* 矛盾～ 周期区间为空 *)
+  lia. (* Contradiction: the periodic interval is empty *)
 Qed.
 
 Lemma optimality2_init :
   optimality2 0 1 0 1.
 Proof.
   unfold optimality2.
-  intros. lia. (* t的范围矛盾 *)
+  intros. lia. (* Range contradiction for t *)
 Qed.
 
 Lemma maxsuf_inv_init :
@@ -318,7 +318,7 @@ Definition in_per_decomp_aux (z p r q : Z) : Prop :=
   (0 < r < p /\ 0 <= q < z) \/
   (0 < r < p /\ q = z).
 
-(* i' 的取余分解 *)
+(* Remainder decomposition of i' *)
 Lemma in_per_decomp (i j k p z i' : Z):
   (var_range i j k p) ->
   (j + k <= Zlength patn) ->
@@ -349,7 +349,7 @@ Proof.
   destruct H9; [left | right]; try lia.
 Qed.
 
-(* Gt下的一个小结论：(skipn j patn) > (skipn i patn) *)
+(* Small lemma under Gt: (skipn j patn) > (skipn i patn) *)
 Lemma lex_gt_ji_Gt (i j k p : Z):
     (cmp_fn (Znth (j + k) patn default) (Znth (i + k) patn default) = Gt) ->
     (j + k < Zlength patn) ->
@@ -422,8 +422,8 @@ Proof.
   unfold optimality'; unfold optimality.
   destruct Hinv.
   pose proof Hrange0 as Hrange; destruct Hrange0.
-  destruct range_ijp0 as [z range_ijp0]. (* 还是要首先destruct出来 *)
-  intros. (* 分i' < i 与 周期边界点， 周期内部三种 *)
+  destruct range_ijp0 as [z range_ijp0]. (* First destruct components *)
+  intros. (* Split into i' < i, boundary point, interior cases *)
   assert (0 <= i' < i \/ i' = i \/ i < i') by lia.
   destruct H2; [| destruct H2; [|]].
   - unfold optimality in Hopt0.
@@ -435,13 +435,13 @@ Proof.
     pose proof lex_gt_ji_Gt i j k p Hcmp H Hrange Hpm0.
     unfold list_lex_gt; left.
     easy.
-  - (* 其余分支，三类情况 *)
+  - (* Remaining branch: three cases *)
     pose proof lex_gt_ji_Gt i j k p Hcmp H Hrange Hpm0.
     assert (exists r q, i' = i + r + q * p /\ in_per_decomp_aux z p r q).
     { apply (in_per_decomp i j k p z i'); auto; try lia. }
     destruct H4 as [r [q [H4 H5]]].
     destruct H5; [ | destruct H5; [ | ]].
-    + (* 周期边界点 r = 0 *)
+    + (* Period boundary r = 0 *)
       unfold list_lex_gt; left.
       set (l1 := Zsublist j (j + k + 1) patn).
       set (l2 := Zsublist i' (i' + k + 1) patn).
@@ -449,7 +449,7 @@ Proof.
       * apply Zsublist_is_prefix; try lia.
       * apply Zsublist_is_prefix; try lia.
       * apply (periodic_edge_Gt i j k p i' q); auto; try lia.
-    + (* 周期内部 *)
+    + (* Interior of the period *)
       specialize (Hopt3 (i + r) ltac:(lia)).
       assert (list_lex_gt_ex cmp_fn (skipn' i patn) (skipn' i' patn)).
       { apply (list_lex_gt_ex_plus cmp_fn (Zsublist i (i + p) patn)
@@ -461,7 +461,7 @@ Proof.
           apply Zsublist_is_prefix; try nia. }
       apply (list_lex_gt_trans cmp_fn _ _ (skipn' i patn) _);
       unfold list_lex_gt; left; auto.
-    + lia. (* i' > j 范围矛盾 *)
+    + lia. (* Range contradiction: i' > j *)
 Qed.
 
 Lemma optimality_holds (i j k p : Z):
@@ -485,7 +485,7 @@ Proof.
   hoare_auto; unfold optimality'.
   - apply (optimality_holds_Eq1 i j k p); auto.
   - apply (optimality_holds_Eq2 i j k p); auto.
-  - apply (optimality_holds_Lt i j k p); auto. (* 其实这仨完全一致 *)
+  - apply (optimality_holds_Lt i j k p); auto. (* These three are essentially identical *)
   - apply (optimality_holds_Gt i j k p); auto.
 Qed.
 
@@ -522,7 +522,7 @@ Proof.
   apply (partial_match_plus i j k p); auto.
 Qed.
 
-(* k = 0时, Trivial *)
+(* Trivial when k = 0 *)
 Lemma partial_match_k0_trivial (i j k p : Z):
   k = 0 ->
   partial_match i j k p.
@@ -575,7 +575,7 @@ Proof.
   destruct Hrange0.
   destruct range_ijp0 as [z range_ijp0].
   unfold periodicity in *.
-  intros. (* 两类情况讨论 *)
+  intros. (* Two-case discussion *)
   assert (t + p < j + k \/ t + p = j + k) by lia.
   destruct H4.
   - apply (Hper0 t); try lia. (* Trivial *)
@@ -599,7 +599,7 @@ Proof.
   destruct Hrange0.
   destruct range_ijp0 as [z range_ijp0].
   unfold periodicity in *.
-  intros. (* 两类情况讨论 *)
+  intros. (* Two-case discussion *)
   assert (t + p < j + k \/ t + p = j + k) by lia.
   destruct H4.
   - apply (Hper0 t); try lia. (* Trivial *)
@@ -611,7 +611,7 @@ Proof.
     apply (periodicity_ext' i j k p (z - 1)); auto; try lia.
 Qed.
 
-(* 只有一个周期的Trivial *)
+(* Trivial case with a single-period window *)
 Lemma periodicity_holds_Lt (i j k p : Z):
   (j + k < Zlength patn) ->
   (maxsuf_inv i j k p) ->
@@ -623,10 +623,10 @@ Proof.
   destruct Hrange0.
   destruct range_ijp0 as [z range_ijp0].
   assert (z = 0 \/ z > 0) by lia.
-  destruct H3; nia. (* 都是范围的矛盾 *)
+  destruct H3; nia. (* Both cases lead to range contradictions *)
 Qed.
 
-(* 周期区间长度为1的Trivial *)
+(* Trivial when the periodic interval length is 1 *)
 Lemma periodicity_holds_Gt (i j k p : Z):
   (j + k < Zlength patn) ->
   (maxsuf_inv i j k p) ->
@@ -637,7 +637,7 @@ Proof.
   destruct Hinv.
   destruct Hrange0.
   destruct range_ijp0 as [z range_ijp0].
-  nia. (* 范围矛盾 *)
+  nia. (* Range contradiction *)
 Qed.
 
 Lemma periodicity_holds (i j k p : Z):
@@ -665,7 +665,7 @@ Proof.
   - apply (periodicity_holds_Gt i j k p); auto.
 Qed.
 
-(* 因为i, p不变导致的Trivial *)
+(* Trivial because i and p remain unchanged *)
 Lemma optimality2_holds_Eq1 (i j k p : Z):
   (k + 1 = p) -> 
   (j + k < Zlength patn) ->
@@ -702,9 +702,9 @@ Proof.
   destruct Hrange0.
   destruct range_ijp0 as [z range_ijp0].
   unfold optimality2.
-  intros. (* 需要分原来的周期边界和周期内部讨论，以及原来的探测区域三个部分讨论 *)
+  intros. (* Split into boundary vs. interior and three probe-region parts *)
   assert (exists r q, t = i + r + q * p /\ in_per_decomp_aux z p r q).
-  { apply (in_per_decomp i j k p z t); auto; try lia. } (* 分解的使用 *)
+  { apply (in_per_decomp i j k p z t); auto; try lia. } (* Use the decomposition *)
   destruct H2 as [r [q [H2 H3]]].
   unfold in_per_decomp_aux in H3.
   destruct H3; [ | destruct H3; [ | ]]; 
@@ -735,24 +735,24 @@ Proof.
     unfold is_proper_prefix; split; auto.
     unfold l1; unfold l1'.
     repeat rewrite Zlength_Zsublist; try lia.
-  - (* 0 < r < p /\ q < z 周期内部 *)
+  - (* 0 < r < p /\ q < z: interior of the period *)
     set (l1 := Zsublist (i) ((i + p)) patn).
     set (l2 := Zsublist (t) ((t + p - r)) patn).
-    assert (list_lex_gt_ex cmp_fn l1 l2). (* 证明前缀的严格小 *)
-    { replace l2 with (Zsublist ((i + r)) ((i + p)) patn). (* 一个转移 *)
+    assert (list_lex_gt_ex cmp_fn l1 l2). (* Prove strict prefix order *)
+    { replace l2 with (Zsublist ((i + r)) ((i + p)) patn). (* A transformation *)
       - apply (Hopt3 (i + r)); try lia.
       - apply (periodic_extension i j k p q); auto; try nia. }
     apply (list_lex_gt_ex_plus cmp_fn l1 l2 _ _ _); unfold l1; unfold l2.
     + apply Zsublist_is_prefix; try nia.
     + apply Zsublist_is_prefix; try nia.
     + apply H4.
-  - (* 0 < r < p /\ q = z 即 t > j *)
-    (* 这里麻烦在不一定有足够长的长度为Hopt2使用 *)
+  - (* 0 < r < p /\ q = z, i.e., t > j *)
+    (* Issue: length may be insufficient to apply Hopt2 *)
     set (l1 := Zsublist (i) ((j + k + 1)) patn).
-    set (l1' := Zsublist (i) ((i + p)) patn). (* 对这里优化改进 *)
+    set (l1' := Zsublist (i) ((i + p)) patn). (* Optimization here *)
     set (l2 := Zsublist ((i + r)) ((i + p)) patn).
     set (l2' := Zsublist ((i + r)) ((i + r + (j + k + 1 - t))) patn).
-    set (l3 := Zsublist (t) ((j + k + 1)) patn). (* Lt 下的 *)
+    set (l3 := Zsublist (t) ((j + k + 1)) patn). (* For the Lt case *)
     assert (z >= 1) by nia.
     assert (list_lex_gt cmp_fn l1 l1').
     { unfold list_lex_gt; right.
@@ -797,7 +797,7 @@ Proof.
       rewrite H7. easy.
 Qed.
 
-(* 由于周期为1导致的Trivial *)
+(* Trivial due to period = 1 *)
 Lemma optimality2_holds_Gt:
   forall j, optimality2 j (j + 1) 0 1.
 Proof.
@@ -883,12 +883,12 @@ Proof.
   unfold is_maximal_suffix.
   split; [lia|]. intros.
   destruct (Z.lt_trichotomy i' i) as [Hlt | [Heq | Hgt]].
-  { unfold list_lex_ge; left; apply (Hopt i' ltac:(lia)). } (* i' < i *)
-  { rewrite Heq; unfold list_lex_ge; right; easy. } (* i' = i, Trivial *)
+  { unfold list_lex_ge; left; apply (Hopt i' ltac:(lia)). } (* Case i' < i *)
+  { rewrite Heq; unfold list_lex_ge; right; easy. } (* Case i' = i (trivial) *)
   assert (i < i' < j + k \/ i' >= j + k) by lia.
   destruct H2; unfold skipn';
   [| rewrite (Zsublist_nil _ i' _); try lia; apply list_lex_ge_nil].
-  unfold list_lex_ge; left. (* 接下来分三类讨论 *)
+  unfold list_lex_ge; left. (* Next, split into three cases *)
   assert (exists r q, i' = i + r + q * p /\ in_per_decomp_aux z p r q).
   { apply (in_per_decomp i j k p z i'); auto; try lia. }
   destruct H3 as [r [q [H3 H4]]].
@@ -903,7 +903,7 @@ Proof.
       rewrite <- H5.
       apply Zsublist_is_prefix; try lia.
     + repeat rewrite Zlength_Zsublist; try lia.
-  - unfold list_lex_gt; left. (* 0 < r < p /\ q < z 周期内部 *)
+  - unfold list_lex_gt; left. (* 0 < r < p /\ q < z: interior of the period *)
     pose proof (Hopt2 (i + r) ltac:(lia)).
     apply (list_lex_gt_ex_plus cmp_fn 
             (Zsublist (i) ((i + p)) patn) 
@@ -914,7 +914,7 @@ Proof.
       { apply (periodic_extension i j k p q); auto; try nia. }
       rewrite <- H6.
       apply Zsublist_is_prefix; try nia.
-  - (* 0 < r < p /\ q = z 探测区间 *)
+  - (* 0 < r < p /\ q = z (probe region) *)
     set (l1 := Zsublist (i) (Zlength patn) patn).
     set (l1' := Zsublist (i) ((i + p)) patn) in *.
     set (l2 := Zsublist ((i + r)) ((i + p)) patn) in *.
@@ -1000,21 +1000,21 @@ Proof.
   assert (z >= 1) by nia.
   unfold is_minimal_period.
   split; intros.
-  - (* 验证p是周期 *)
+  - (* Verify p is a period *)
     unfold is_period.
     unfold skipn'.
     split; [lia |]; intros.
     rewrite Zlength_Zsublist in H3; try lia.
     repeat rewrite Znth_Zsublist; try lia.
     apply (periodicity_ext' i j k p 1 _ _); auto; try nia.
-  - (* 验证p是最小周期 *)
-    (* 思路是与周期内部严格字典序关系的矛盾，只需找到一个反例即可 *)
+  - (* Verify p is the minimal period *)
+    (* Idea: contradiction with strict lex order inside the period; find a counterexample *)
     assert (Hnot : p' < p \/ p' >= p) by lia.
     destruct Hnot; try lia.
     unfold skipn', is_period in H2.
     rewrite Zlength_Zsublist in H2; try lia.
     destruct H2 as [Hp Hper0].
-    assert (periodicity i j k p'). (* 这里可以写作一个引理 is_period => periodicity *)
+    assert (periodicity i j k p'). (* Could be packaged as a lemma: is_period => periodicity *)
     { unfold periodicity.
       intros.
       specialize (Hper0 (t - i) ltac:(lia)).

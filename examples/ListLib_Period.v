@@ -14,11 +14,11 @@ Local Open Scope list.
 
 Section list_period_lemma.
 
-(* MARK: 周期的定义和长度的关系 *)
+(* MARK: Relation between the period definition and the sequence length *)
 Definition is_period {A : Type} (default : A) (l : list A) (p : Z) : Prop :=
   0 < p /\
   (forall (i : Z),
-    0 <= i -> (* SRAR : 改成Z需要注意更多范围约束 *)
+    0 <= i -> (* Note: switching to Z requires stricter range constraints *)
     i + p < Zlength l ->
     Znth i l default = Znth (i + p) l default).
 
@@ -67,7 +67,7 @@ Qed.
 Definition border {A : Type} (l l1 : list A) : Prop :=
   is_prefix l1 l /\ is_suffix l1 l.
 
-(* max_boder_min_period 的特化版本 *)
+(* Specialized version of max_border_min_period *)
 Lemma max_border_min_period_spec_1 {A : Type} (default : A) (l l1 : list A): 
   is_prefix l1 l ->
   is_suffix l1 l ->
@@ -143,7 +143,7 @@ Proof.
   apply H1.
 Qed.
 
-(* 这里设计的也不太好，其实不是presuffix，而是sublist的包含 *)
+(* Design note: this is about sublist containment, not prefix/suffix *)
 Lemma suffix_less_period {A : Type} (default : A) (l1 l2 : list A) (p1 p2 : Z):
   is_suffix l2 l1 ->
   is_minimal_period default l1 p1 ->

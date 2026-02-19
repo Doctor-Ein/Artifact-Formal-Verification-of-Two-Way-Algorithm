@@ -5,7 +5,7 @@ Require Import Coq.micromega.Psatz.
 Require Import Coq.Arith.Wf_nat.
 Require Import Coq.Classes.Morphisms.
 Require Import Coq.Lists.List.
-Require Import Orders. (* 这里引入comparison *)
+Require Import Orders. (* Import comparison/order definitions *)
 Require Import ListLib.Base.Inductive.
 Require Import ListLib.Base.Positional.
 Require Import ListLib.General.Presuffix.
@@ -27,14 +27,14 @@ Local Open Scope list.
 
 Section two_way_complete.
 
-(* 搭建完整的two-way算法的证明目标 *)
+(* Establish the proof goal for the complete two-way algorithm *)
 
 Definition match_phase (l p : Z): program (option Z) :=
   choice
     (assume (Zsublist 0 l patn = Zsublist p (l + p) patn);; 
-      match_algo l p) (* 重复模式 *)
+      match_algo l p) (* Repetitive case *)
     (assume (Zsublist 0 l patn <> Zsublist p (l + p) patn);; 
-      match_algo l (Z.max l (Zlength patn - l) + 1)). (* 非重复模式 *)
+      match_algo l (Z.max l (Zlength patn - l) + 1)). (* Non-repetitive case *)
 
 Definition two_way_algo_complete: program (option Z) :=
   choice
@@ -43,8 +43,8 @@ Definition two_way_algo_complete: program (option Z) :=
     '(l1, p1) <- maxsuf_cal patn cmp;;
     '(l2, p2) <- maxsuf_cal patn cmp_rev;;
     choice
-      (assume (l1 <= l2);; match_phase l2 p2) (* 反向字典序为临界分解位置 *)
-      (assume (l2 < l1);; match_phase l1 p1) (* 正向字典序为临界分解位置 *)
+      (assume (l1 <= l2);; match_phase l2 p2) (* Reverse-lex critical split *)
+      (assume (l2 < l1);; match_phase l1 p1) (* Forward-lex critical split *)
   ).
 
 Lemma first_occur_0_trivial: 
@@ -92,9 +92,9 @@ Lemma l_less_mp (cmp_fn : A -> A -> comparison) (l p : Z):
   0 <= l < mp /\ mp <= Zlength patn.
 Proof.
   intros Cmpfn. intros.
-  destruct H0. (* 应该复用 *)
+  destruct H0. (* Should reuse prior results *)
   destruct Hper0.
-  split; [|apply mp_range]. (* 证明临界分解位置小于全局周期 *)
+  split; [|apply mp_range]. (* Show the critical split position is < global period *)
   pose proof mp_range as mp_range.
   pose proof mp_existence as mp_existence.
   destruct Hmaxsuf0.
@@ -160,7 +160,7 @@ Proof.
     apply mp_existence. }
   constructor.
   - apply (l_less_mp cmp_rev l2 p2 Cmp_rev); auto.
-  - (* 关键证明，更新的p'值也满足小于等于全局周期 *)
+  - (* Key step: the updated p' still satisfies p' <= global period *)
     assert (l2 >= (Zlength patn - l2) \/ l2 < (Zlength patn - l2)) by lia.
     destruct H4.
     1:{ assert (p' = l2 + 1) by lia.
@@ -244,7 +244,7 @@ Proof.
           apply Zsublist_is_suffix; try lia.
         - apply mp_existence.
         - split; try auto. }
-      lia. (* 矛盾 ~ *)
+      lia. (* Contradiction *)
     + assert (p2 < l2 \/ p2 >= l2) by lia.
       destruct H16.
       1:{ assert (Zsublist (l2 - p2) l2 patn = 
@@ -594,26 +594,26 @@ Proof.
   1:{ apply maxsuf_cal_maxsuf_prop; auto. apply Cmp_rev. }
   intros. destruct a as [l2 p2].
   hoare_auto; unfold match_phase; hoare_auto.
-  - (* 右临界位，重复模式 *)
+  - (* Right critical position, repetitive case *)
     assert (crit_factor_prop l2 p2).
     { apply (crit_factor_prop_rrep l1 p1); auto. }
     apply match_algo_correct; auto.
-  - (* 右临界位，非重复模式*)
+  - (* Right critical position, non-repetitive case *)
     set (p' := Z.max l2 (Zlength patn - l2) + 1).
     assert (crit_factor_prop l2 p').
     { apply (crit_factor_prop_rnrep l1 p1 _ p2); auto. }
     apply match_algo_correct; auto.
-  - (* 左临界位，重复模式 *)
+  - (* Left critical position, repetitive case *)
   assert (crit_factor_prop l1 p1).
   { apply (crit_factor_prop_lrep l1 p1 l2 p2); auto. }
   apply match_algo_correct; auto.
-  - (* 左临界位，非重复模式*)
+  - (* Left critical position, non-repetitive case *)
     set (p' := Z.max l1 (Zlength patn - l1) + 1).
     assert (crit_factor_prop l1 p').
     { apply (crit_factor_prop_lnrep l1 p1 l2 p2); auto. }
     apply match_algo_correct; auto.
 Qed.
 
-(* TODO：匹配阶段的名字修正，以及全部英文化+结构整理 *)
+(* TODO: refine naming in the matching phase and fully translate/organize *)
 
 End two_way_complete.

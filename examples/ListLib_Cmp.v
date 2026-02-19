@@ -170,7 +170,7 @@ Proof.
       split.
       * apply nil_prefix.
       * rewrite Zlength_nil.
-        lia. (* www发现Zlength还不支持simpl *)
+        lia. (* Note: Zlength does not simplify via simpl *)
 Qed.
 
 Lemma proper_prefix_discriminate_gt_ex (cmp_fn : A -> A -> comparison) (l1 l2 : list A):
