@@ -22,12 +22,9 @@ Local Open Scope monad.
 Local Open Scope list.
 
 Section maxsuf_proof.
-
-Context {A : Type}.
-Context (default : A).
 Context (patn : list A).
 Context (cmp_fn : A -> A -> comparison).
-Context `{Cmp A cmp_fn}.
+Context `{Cmp cmp_fn}.
 
 (* 利用SetMonad定义body TODO: 所有英文的翻译 *)
 Definition maxsuf_cal_body (s : Z * Z * Z * Z) :
@@ -364,10 +361,11 @@ Proof.
   destruct Hrange.
   destruct range_ijp0 as [z range_ijp0].
   unfold partial_match in Hpm.
-  apply (list_lex_gt_ex_ex' default cmp_fn (skipn' j patn) (skipn' i patn)).
+  apply (list_lex_gt_ex_ex' cmp_fn (skipn' j patn) (skipn' i patn)).
   exists k.
   unfold list_lex_gt_ex'.
-  split; [|split;[|split]]; unfold skipn'.
+  split; [|split;[|split;[|split]]]; unfold skipn'.
+  - lia.
   - rewrite Zlength_Zsublist; try lia.
   - rewrite Zlength_Zsublist; try lia.
   - rewrite Zsublist_Zsublist; try lia.
@@ -396,10 +394,11 @@ Proof.
   destruct Hrange'.
   destruct range_ijp0 as [z range_ijp0].
   assert (0 < q <= z) by nia.
-  apply (list_lex_gt_ex_ex' default cmp_fn (Zsublist j (j + k + 1) patn) (Zsublist i' (i' + k + 1) patn)).
+  apply (list_lex_gt_ex_ex' cmp_fn (Zsublist j (j + k + 1) patn) (Zsublist i' (i' + k + 1) patn)).
   exists k.
   unfold list_lex_gt_ex'.
-  split; [|split;[|split]].
+  split; [|split;[|split;[|split]]].
+  - lia.
   - rewrite Zlength_Zsublist; try lia.
   - rewrite Zlength_Zsublist; try lia.
   - repeat rewrite Zsublist_Zsublist; try lia.
@@ -430,7 +429,7 @@ Proof.
   - unfold optimality in Hopt0.
     pose proof Hopt0 i' H2.
     pose proof lex_gt_ji_Gt i j k p Hcmp H Hrange Hpm0.
-    eapply (list_lex_gt_trans default); auto.
+    eapply list_lex_gt_trans; auto.
     unfold list_lex_gt; left; auto.
   - rewrite H2.
     pose proof lex_gt_ji_Gt i j k p Hcmp H Hrange Hpm0.
@@ -446,22 +445,21 @@ Proof.
       unfold list_lex_gt; left.
       set (l1 := Zsublist j (j + k + 1) patn).
       set (l2 := Zsublist i' (i' + k + 1) patn).
-      apply (list_lex_gt_ex_plus default cmp_fn l1 l2 (skipn' j patn) (skipn' i' patn)); unfold skipn'.
+      apply (list_lex_gt_ex_plus cmp_fn l1 l2 (skipn' j patn) (skipn' i' patn)); auto; unfold skipn'.
       * apply Zsublist_is_prefix; try lia.
       * apply Zsublist_is_prefix; try lia.
       * apply (periodic_edge_Gt i j k p i' q); auto; try lia.
     + (* 周期内部 *)
       specialize (Hopt3 (i + r) ltac:(lia)).
       assert (list_lex_gt_ex cmp_fn (skipn' i patn) (skipn' i' patn)).
-      { apply (list_lex_gt_ex_plus default cmp_fn
-                (Zsublist i (i + p) patn)
+      { apply (list_lex_gt_ex_plus cmp_fn (Zsublist i (i + p) patn)
                 (Zsublist (i + r) (i + p) patn)); auto; unfold skipn'.
         - apply Zsublist_is_prefix; try nia.
         - assert (Zsublist (i + r) (i + p) patn = Zsublist i' (i' + p - r) patn).
           { apply (periodic_extension i j k p q); auto; try nia. }
           rewrite H6.
           apply Zsublist_is_prefix; try nia. }
-      apply (list_lex_gt_trans default cmp_fn _ (skipn' i patn) _);
+      apply (list_lex_gt_trans cmp_fn _ _ (skipn' i patn) _);
       unfold list_lex_gt; left; auto.
     + lia. (* i' > j 范围矛盾 *)
 Qed.
@@ -717,9 +715,10 @@ Proof.
     set (l2 := (Zsublist (t) ((j + k + 1)) patn)).
     set (l1' := (Zsublist (i) ((i + (j + k + 1 - t))) patn)).
     assert (list_lex_gt_ex cmp_fn l1' l2).
-    { apply (list_lex_gt_ex_ex' default cmp_fn l1' l2).
+    { apply (list_lex_gt_ex_ex' cmp_fn l1' l2).
       exists (j + k - t). unfold list_lex_gt_ex'.
-      split; [ | split; [|split]]; unfold l1'; unfold l2.
+      split; [| split; [|split; [|split]]]; unfold l1'; unfold l2.
+      - lia.
       - rewrite Zlength_Zsublist; try lia.
       - rewrite Zlength_Zsublist; try lia.
       - repeat rewrite Zsublist_Zsublist; try lia.
@@ -730,7 +729,7 @@ Proof.
         { apply (periodicity_ext' i j k p (z - q)); auto; try nia. }
         rewrite <- H5. apply cmp_Lt_Gt. auto. 
     }
-    apply (list_lex_gt_ex_trans' default cmp_fn _ l1' _); auto.
+    apply (list_lex_gt_ex_trans' cmp_fn _ _ l1' _); auto.
     assert (Presuffix.is_prefix l1' l1). { apply Zsublist_is_prefix; try lia. }
     unfold list_lex_gt; right.
     unfold is_proper_prefix; split; auto.
@@ -743,7 +742,7 @@ Proof.
     { replace l2 with (Zsublist ((i + r)) ((i + p)) patn). (* 一个转移 *)
       - apply (Hopt3 (i + r)); try lia.
       - apply (periodic_extension i j k p q); auto; try nia. }
-    apply (list_lex_gt_ex_plus default cmp_fn l1 l2 _ _); unfold l1; unfold l2.
+    apply (list_lex_gt_ex_plus cmp_fn l1 l2 _ _ _); unfold l1; unfold l2.
     + apply Zsublist_is_prefix; try nia.
     + apply Zsublist_is_prefix; try nia.
     + apply H4.
@@ -776,9 +775,10 @@ Proof.
         + repeat rewrite Zlength_Zsublist; try nia.
     }
     assert (list_lex_gt_ex cmp_fn l2' l3).
-    { apply (list_lex_gt_ex_ex' default cmp_fn l2' l3).
+    { apply (list_lex_gt_ex_ex' cmp_fn l2' l3).
       exists (j + k - t ). unfold list_lex_gt_ex'.
-      split; [| split;[|split]]; unfold l2'; unfold l3.
+      split; [| split;[|split;[|split]]]; unfold l2'; unfold l3.
+      - lia.
       - rewrite Zlength_Zsublist; lia.
       - rewrite Zlength_Zsublist; lia.
       - repeat rewrite Zsublist_Zsublist; try lia.
@@ -789,11 +789,11 @@ Proof.
         apply (cmp_Lt_Gt _ _); auto.
     }
     destruct H7.
-    + apply (list_lex_gt_ex_trans' default cmp_fn _ l1' _); auto.
-      apply (list_lex_gt_ex_trans default cmp_fn _ l2 _); auto.
-      apply (list_lex_gt_ex_trans' default cmp_fn _ l2' _); auto.
-    + apply (list_lex_gt_ex_trans' default cmp_fn _ l1' _); auto.
-      apply (list_lex_gt_ex_trans default cmp_fn _ l2 _); auto.
+    + apply (list_lex_gt_ex_trans' cmp_fn _ _ l1' _); auto.
+      apply (list_lex_gt_ex_trans cmp_fn _ _ l2 _); auto.
+      apply (list_lex_gt_ex_trans' cmp_fn _ _ l2' _); auto.
+    + apply (list_lex_gt_ex_trans' cmp_fn _ _ l1' _); auto.
+      apply (list_lex_gt_ex_trans cmp_fn _ _ l2 _); auto.
       rewrite H7. easy.
 Qed.
 
@@ -905,7 +905,7 @@ Proof.
     + repeat rewrite Zlength_Zsublist; try lia.
   - unfold list_lex_gt; left. (* 0 < r < p /\ q < z 周期内部 *)
     pose proof (Hopt2 (i + r) ltac:(lia)).
-    apply (list_lex_gt_ex_plus default cmp_fn 
+    apply (list_lex_gt_ex_plus cmp_fn 
             (Zsublist (i) ((i + p)) patn) 
             (Zsublist ((i + r)) ((i + p)) patn) _ _); auto.
     + apply Zsublist_is_prefix; try nia.
@@ -941,8 +941,8 @@ Proof.
     assert (l2' = l3).
     { unfold l2'; unfold l3.
       apply (periodic_extension i j k p q); auto; try lia. }
-    apply (list_lex_gt_trans default cmp_fn _ l1' _); auto.
-    apply (list_lex_gt_trans default cmp_fn _ l2 _); auto.
+    apply (list_lex_gt_trans cmp_fn _ _ l1' _); auto.
+    apply (list_lex_gt_trans cmp_fn _ _ l2 _); auto.
     rewrite <- H9; auto.
 Qed.
 
@@ -1025,8 +1025,7 @@ Proof.
       apply Hper0. lia.
     } clear Hper0.
     assert (Zsublist i (i + p - p') patn = Zsublist (i + p') (i + p) patn).
-    { apply (periodic_extension i j k p' 1); auto; try nia.
-       }
+    { apply (periodic_extension i j k p' 1); auto; try nia. }
     specialize (Hopt2 (i + p') ltac:(lia)).
     assert (is_proper_prefix (Zsublist ((i + p')) ((i + p)) patn) (Zsublist (i) ((i + p)) patn)).
     { unfold is_proper_prefix.
@@ -1034,7 +1033,7 @@ Proof.
       rewrite <- H4.
       apply Zsublist_is_prefix; try nia.
     }
-    pose proof proper_prefix_discriminate_gt_ex default cmp_fn _ _ Hopt2 H5.
+    pose proof proper_prefix_discriminate_gt_ex cmp_fn _ _ _ Hopt2 H5.
     tauto.
 Qed.
 

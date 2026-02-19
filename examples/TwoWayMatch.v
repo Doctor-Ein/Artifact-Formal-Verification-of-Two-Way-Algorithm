@@ -23,16 +23,8 @@ Local Open Scope Z_scope.
 Local Open Scope monad.
 Local Open Scope list.
 
-Parameter (A : Type).
-Parameter (default : A).
 Parameter (patn : list A).
 Parameter (text : list A).
-Parameter cmp : A -> A -> comparison.
-Parameter CmpA : Cmp cmp.
-Existing Instance CmpA.
-
-Definition cmp_rev : A -> A -> comparison :=
-  cmp_rev' cmp.
 
 Parameter mp : Z.
 Axiom mp_existence : is_minimal_period default patn mp. (* 假设全局周期的逻辑存在性 *)
@@ -211,12 +203,13 @@ Qed.
 
 (* 引理：最大后缀的切分点不存在完整的局部周期 *)
 Lemma maxsuffix_cut_no_full_local_period (cmp_fn : A -> A -> comparison) (i : Z) (w : list A):
+  Cmp cmp_fn ->
   is_maximal_suffix patn cmp_fn i ->
   is_suffix w (Zsublist 0 i patn) ->
   is_prefix w (Zsublist i (Zlength patn) patn) ->
   w = nil.
 Proof.
-  intros. (* 分解 x = uv , v = wt *)
+  intros Cmpfn. intros. (* 分解 x = uv , v = wt *)
   unfold is_maximal_suffix in H.
   destruct H.
   assert (0 <= 0 <= i /\ i <= Zlength patn) by lia.
@@ -245,8 +238,8 @@ Proof.
   { rewrite (Zsublist_split _ _ i); try lia.
     rewrite <- H8. rewrite H10. reflexivity. }
   rewrite H11 in H6. (* wt >= wwt *)
-  apply (list_lex_ge_param_prefix_inv default) in H6.
-  pose proof list_lex_ge_param_assym default _ _ _ H6 H7.
+  apply (list_lex_ge_param_prefix_inv cmp_fn _ _ _ _) in H6.
+  pose proof list_lex_ge_param_assym cmp_fn _ _ _ H6 H7.
   apply (f_equal (fun l => Zlength l)) in H12.
   rewrite Zlength_app in H12.
   assert (Zlength w = 0) by lia.
@@ -284,7 +277,7 @@ Proof.
   rewrite H8 in H4. rewrite H8 in H5.
   set (y := skipn' 1 patn) in *.
   assert (is_prefix y patn).
-  { apply (prefix_ordering default _ patn y); auto. }
+  { apply (prefix_ordering patn y); auto. }
   assert (is_suffix y patn).
   { exists (Zsublist 0 1 patn).
     subst y. unfold skipn'.
@@ -361,7 +354,7 @@ Proof.
         { rewrite H16.
           apply Zsublist_is_suffix; try lia. }
         assert (w = nil).
-        { apply (maxsuffix_cut_no_full_local_period cmp i w); try auto.
+        { apply (maxsuffix_cut_no_full_local_period cmp i w _); try auto.
           split; auto. }
         assert (Zlength w = r).
         { apply (f_equal (fun l => Zlength l)) in H16.
@@ -392,7 +385,7 @@ Proof.
               reflexivity.
             - repeat rewrite Zlength_Zsublist; try lia.
           }
-          pose proof proper_prefix_discriminate_gt_ex' default _ _ _ H16 H18.
+          pose proof proper_prefix_discriminate_gt_ex' _ _ _ _ H16 H18.
           tauto.
         + unfold is_proper_prefix in H16.
           unfold skipn' in H16.
@@ -559,11 +552,12 @@ Proof.
         subst v. rewrite Zlength_Zsublist; try lia.
       }
       assert (list_lex_ge cmp_rev v z').
-      { rewrite H18 in H20. apply (list_lex_ge_param_prefix_inv default _ _ _ _ H20). }
+      { rewrite H18 in H20.
+        apply (list_lex_ge_param_prefix_inv cmp_rev _ _ _ Cmp_rev H20). }
       assert (list_lex_ge cmp v z').
       { apply H2. lia. }
       assert (is_prefix z' v).
-      { apply (prefix_ordering default cmp); try auto. }
+      { apply (prefix_ordering); try auto. }
       assert (is_period default patn r).
       { assert (r = Zlength (u ++ z)).
         { rewrite Zlength_app in H15.
@@ -610,9 +604,8 @@ Proof.
         assert (is_suffix w (Zsublist 0 j patn)).
         { rewrite H16. apply Zsublist_is_suffix; try lia. }
         assert (w = nil).
-        { apply (maxsuffix_cut_no_full_local_period cmp_rev j w); try auto.
-          split; auto.
-        }
+        { apply (maxsuffix_cut_no_full_local_period cmp_rev j w Cmp_rev); try auto.
+          split; auto. }
         assert (Zlength w = r).
         { apply (f_equal (fun l => Zlength l)) in H16.
           rewrite Zlength_Zsublist in H16; try lia. }
@@ -639,7 +632,7 @@ Proof.
               rewrite <- Zsublist_split; try lia.
               reflexivity.
             - repeat rewrite Zlength_Zsublist; try lia. }
-          pose proof proper_prefix_discriminate_gt_ex' default _ _ _ H16 H18.
+          pose proof proper_prefix_discriminate_gt_ex' _ _ _ Cmp_rev H16 H18.
           tauto.
         + unfold is_proper_prefix in H16.
           unfold skipn' in H16.
@@ -793,9 +786,9 @@ Proof.
       assert (list_lex_ge cmp_rev v' z').
       { subst z'. apply H3. lia. }
       assert (list_lex_ge cmp v' z').
-      { rewrite H18 in H20. apply (list_lex_ge_param_prefix_inv default cmp _ _ _ H20). }
+      { rewrite H18 in H20. apply (list_lex_ge_param_prefix_inv cmp _ _ _ CmpA H20). }
       assert (is_prefix z' v').
-      { apply (prefix_ordering default cmp); try auto. }
+      { apply (prefix_ordering); try auto. }
       assert (is_period default patn r).
       { assert (r = Zlength (u' ++ z)).
         { rewrite Zlength_app in H15.

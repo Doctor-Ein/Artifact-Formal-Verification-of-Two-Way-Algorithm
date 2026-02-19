@@ -203,4 +203,16 @@ Proof.
     lia.
 Qed.
 
+Lemma Zsublist_split_mid {A : Type} (default : A) (l : list A) (len : Z):
+  0 <= len < Zlength l ->
+  l = Zsublist 0 len l ++ (Znth len l default) :: Zsublist (len + 1) (Zlength l) l.
+Proof.
+  intros.
+  rewrite <- (Zsublist_all l) at 1.
+  rewrite (Zsublist_split _ _ len); try lia.
+  rewrite (Zsublist_split len _ (len + 1)); try lia.
+  rewrite (Zsublist_single default); try lia.
+  simpl. reflexivity.
+Qed.
+
 End Zsublist_extend.

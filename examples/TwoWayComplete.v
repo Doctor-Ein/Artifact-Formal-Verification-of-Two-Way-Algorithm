@@ -40,8 +40,8 @@ Definition two_way_algo_complete: program (option Z) :=
   choice
   (assume (patn = nil) ;; return (Some 0))
   (assume (patn <> nil);;
-    '(l1, p1) <- maxsuf_cal default patn cmp;;
-    '(l2, p2) <- maxsuf_cal default patn cmp_rev;;
+    '(l1, p1) <- maxsuf_cal patn cmp;;
+    '(l2, p2) <- maxsuf_cal patn cmp_rev;;
     choice
       (assume (l1 <= l2);; match_phase l2 p2) (* 反向字典序为临界分解位置 *)
       (assume (l2 < l1);; match_phase l1 p1) (* 正向字典序为临界分解位置 *)
@@ -69,7 +69,7 @@ Lemma maxsuf_cal_maxsuf_prop (cmp_fn : A -> A -> comparison):
   Cmp cmp_fn ->
   patn <> nil ->
   Hoare
-    (maxsuf_cal default patn cmp_fn)
+    (maxsuf_cal patn cmp_fn)
     (fun '(l, p) => maxsuf_prop cmp_fn l p).
 Proof.
   intros Cmpfn Hnnil.
@@ -85,12 +85,13 @@ Proof.
   - apply p_is_minimal_period; auto.
 Qed.
 
-Lemma l_less_mp (cmp_fn : A -> A -> comparison) (l p : Z) :
+Lemma l_less_mp (cmp_fn : A -> A -> comparison) (l p : Z):
+  Cmp cmp_fn ->
   patn <> nil ->
   maxsuf_prop cmp_fn l p ->
   0 <= l < mp /\ mp <= Zlength patn.
 Proof.
-  intros.
+  intros Cmpfn. intros.
   destruct H0. (* 应该复用 *)
   destruct Hper0.
   split; [|apply mp_range]. (* 证明临界分解位置小于全局周期 *)
@@ -113,7 +114,7 @@ Proof.
         apply (periodic_segment' default patn mp 1); auto; try lia. }
       rewrite H5. reflexivity.
     - repeat rewrite Zlength_Zsublist; try lia. }
-  pose proof ge_discriminate_gt default _ _ _ H3 H5.
+  pose proof ge_discriminate_gt _ _ _ Cmpfn H3 H5.
   tauto.
 Qed.
 
@@ -127,7 +128,7 @@ Lemma crit_factor_prop_rrep (l1 p1 l2 p2 : Z):
 Proof.
   intros.
   constructor.
-  - apply (l_less_mp cmp_rev l2 p2); auto.
+  - apply (l_less_mp cmp_rev l2 p2 Cmp_rev); auto.
   - destruct H1.
     assert (p2 <= mp).
     { apply (suffix_less_period default patn (skipn' l2 patn)); auto.
@@ -158,12 +159,12 @@ Proof.
     apply fwd_rev_maxsuffix_cut_critical_factorization; auto.
     apply mp_existence. }
   constructor.
-  - apply (l_less_mp cmp_rev l2 p2); auto.
+  - apply (l_less_mp cmp_rev l2 p2 Cmp_rev); auto.
   - (* 关键证明，更新的p'值也满足小于等于全局周期 *)
     assert (l2 >= (Zlength patn - l2) \/ l2 < (Zlength patn - l2)) by lia.
     destruct H4.
     1:{ assert (p' = l2 + 1) by lia.
-        pose proof l_less_mp cmp_rev l2 p2 H H1.
+        pose proof l_less_mp cmp_rev l2 p2 Cmp_rev H H1.
         lia. }
     assert (p' = Zlength patn - l2 + 1) by lia.
     destruct H1. destruct Hmaxsuf0.
@@ -260,7 +261,7 @@ Proof.
             subst v. unfold skipn' in H18.
             rewrite Zsublist_Zsublist in H18; try lia.
             assert (0 <= l2 < mp /\ mp <= Zlength patn).
-            { apply (l_less_mp cmp_rev l2 p2); auto.
+            { apply (l_less_mp cmp_rev l2 p2 Cmp_rev); auto.
               split; [split|split]; auto. }
             rewrite Zsublist_Zsublist in H18; try lia.
             simpl in H18.
@@ -314,7 +315,7 @@ Proof.
         2:{ rewrite Zlength_Zsublist in H17; try lia. }
         rewrite Zsublist_Zsublist in H18; try lia.
         2:{ assert (0 <= l2 < mp /\ mp <= Zlength patn).
-            { apply (l_less_mp cmp_rev l2 p2); auto.
+            { apply (l_less_mp cmp_rev l2 p2 Cmp_rev); auto.
               split; split; auto. }
             lia. }
         replace (p2 - l2 + l2) with p2 in H18 by lia.
@@ -339,7 +340,7 @@ Lemma crit_factor_prop_lrep (l1 p1 l2 p2 : Z):
 Proof.
   intros.
   constructor.
-  - apply (l_less_mp cmp l1 p1); auto.
+  - apply (l_less_mp cmp l1 p1 CmpA); auto.
   - destruct H0.
     assert (p1 <= mp).
     { apply (suffix_less_period default patn (skipn' l1 patn)); auto.
@@ -369,51 +370,37 @@ Proof.
     replace l1 with (Z.max l1 l2) by lia.
     apply fwd_rev_maxsuffix_cut_critical_factorization; auto.
     apply mp_existence. }
-
   constructor.
-  - apply (l_less_mp cmp l1 p1); auto.
-
+  - apply (l_less_mp cmp l1 p1 CmpA); auto.
   - assert (l1 >= (Zlength patn - l1) \/
             l1 < (Zlength patn - l1)) by lia.
     destruct H4.
-
     1:{ assert (p' = l1 + 1) by lia.
-        pose proof l_less_mp cmp l1 p1 H H0.
+        pose proof l_less_mp cmp l1 p1 CmpA H H0.
         lia. }
-
     assert (p' = Zlength patn - l1 + 1) by lia.
-
     destruct H0. destruct Hmaxsuf0.
-
     assert (mp <= Zlength patn - l1 \/
             mp > Zlength patn - l1) by lia.
     destruct H7; [|lia].
-
     pose proof mp_existence.
     destruct H8.
-
     assert (is_period default (skipn' l1 patn) mp).
     { apply (suffix_contains_period default patn _).
       - rewrite <- (Zsublist_all patn) at 2.
         unfold skipn'.
         apply Zsublist_is_suffix; try lia.
       - destruct mp_existence; auto. }
-
     destruct Hper0.
     pose proof H11 as H11'.
     destruct H11.
-
     set (q := mp / p1).
     set (r := mp mod p1).
-
     assert (mp = p1 * q + r).
     { apply Z.div_mod. lia. }
-
     assert (0 < r < p1 \/ r = 0).
     { pose proof Z.mod_pos_bound mp p1 H11. lia. }
-
     destruct H15.
-
     + (* 0 < r < p1 *)
       assert (local_period l1 r).
       { unfold local_period.
@@ -422,9 +409,7 @@ Proof.
         assert (Zsublist (l1 - r) l1 patn =
                 Zsublist (l1 + mp - r) (l1 + mp) patn).
         { apply (periodic_segment' default patn mp 1); auto; try lia. }
-
         set (v := skipn' l1 patn).
-
         assert (p1 <= mp).
         { apply (suffix_less_period default patn v).
           - subst v. unfold skipn'.
@@ -432,7 +417,6 @@ Proof.
             apply Zsublist_is_suffix; try lia.
           - apply mp_existence.
           - split; auto. }
-
         assert (Zsublist l1 (l1 + r) patn =
                 Zsublist (l1 + mp - r) (l1 + mp) patn).
         { assert (Zsublist 0 r v =
@@ -445,7 +429,6 @@ Proof.
               rewrite <- H14.
               unfold v, skipn'.
               rewrite Zlength_Zsublist; try lia. }
-
           subst v.
           unfold skipn' in H21.
           rewrite Zsublist_Zsublist in H21; try lia.
@@ -455,9 +438,7 @@ Proof.
           replace (l1 + mp - r) with (mp - r + l1) by lia.
           replace (l1 + mp) with (mp + l1) by lia.
           apply H21. }
-
         rewrite <- H21 in H19.
-
         assert (l1 - r < 0 \/ l1 - r >= 0) by lia.
         destruct H22.
         1:{
@@ -466,7 +447,6 @@ Proof.
           rewrite Zlength_Zsublist in H19; try lia.
           rewrite Zlength_Zsublist in H19; try lia.
         }
-
         apply (f_equal (fun l => Znth i l default)) in H19.
         rewrite Znth_Zsublist in H19; try lia.
         rewrite Znth_Zsublist in H19; try lia.
@@ -474,10 +454,8 @@ Proof.
         replace (l1 + i) with (i + l1) by lia.
         apply H19.
       }
-
       destruct Hmmp.
       specialize (H18 r H16).
-
       assert (p1 <= mp).
       { set (v := skipn' l1 patn).
         apply (suffix_less_period default patn v).
@@ -486,18 +464,13 @@ Proof.
           apply Zsublist_is_suffix; try lia.
         - apply mp_existence.
         - split; auto. }
-
       lia.
-
     + (* r = 0 *)
       assert (p1 < l1 \/ p1 >= l1) by lia.
       destruct H16.
-
-      1:{
-        assert (Zsublist (l1 - p1) l1 patn =
+      1:{ assert (Zsublist (l1 - p1) l1 patn =
                 Zsublist (l1 + mp - p1) (l1 + mp) patn).
         { apply (periodic_segment' default patn mp 1); auto; try lia. }
-
         assert (Zsublist l1 (l1 + p1) patn =
                 Zsublist (l1 + mp - p1) (l1 + mp) patn).
         { set (v := skipn' l1 patn).
@@ -508,7 +481,6 @@ Proof.
               auto; try lia;
               unfold v, skipn';
               rewrite Zlength_Zsublist; try lia. }
-
           subst v.
           unfold skipn' in H18.
           rewrite Zsublist_Zsublist in H18; try lia.
@@ -527,9 +499,7 @@ Proof.
           replace (l1 + mp - p1) with (mp - p1 + l1) by lia.
           replace (l1 + mp) with (mp + l1) by lia.
           apply H18. }
-
         rewrite <- H18 in H17.
-
         assert (local_period l1 p1).
         { unfold local_period.
           split; [|split]; try lia.
@@ -540,7 +510,6 @@ Proof.
           replace (l1 + i - p1) with (i + (l1 - p1)) by lia.
           replace (l1 + i) with (i + l1) by lia.
           apply H17. }
-
         assert (p1 = mp).
         { destruct Hmmp.
           specialize (H21 p1 H19).
@@ -553,14 +522,11 @@ Proof.
             - apply mp_existence.
             - split; auto. }
           lia. }
-
         assert (Zsublist 0 l1 patn =
                 Zsublist p1 (l1 + p1) patn).
         { apply (periodic_segment' default patn mp 1); auto; try lia. }
-
         contradiction.
       }
-
       assert (Zsublist p1 (l1 + p1) patn =
               Zsublist mp (l1 + mp) patn).
       { set (v := skipn' l1 patn).
@@ -582,9 +548,7 @@ Proof.
           unfold v, skipn' in H18.
           rewrite Zlength_Zsublist in H18; try lia.
         }
-
-        subst v.
-        unfold skipn' in *.
+        subst v. unfold skipn' in *.
         rewrite Zsublist_Zsublist in H17; try lia.
         2:{ set (v := skipn' l1 patn).
             assert (is_minimal_period default v p1).
@@ -599,7 +563,7 @@ Proof.
             rewrite Zlength_Zsublist in H19; try lia. }
         rewrite Zsublist_Zsublist in H17; try lia.
         2:{ assert (0 <= l1 < mp /\ mp <= Zlength patn).
-            { apply (l_less_mp cmp l1 p1); auto.
+            { apply (l_less_mp cmp l1 p1 CmpA); auto.
               split; split; auto. }
             lia. }
         replace (p1 - l1 + l1) with p1 in H17 by lia.
@@ -607,14 +571,11 @@ Proof.
         replace (l1 + p1) with (p1 + l1) by lia.
         replace (l1 + mp) with (mp + l1) by lia.
         apply H17. }
-
       assert (Zsublist 0 l1 patn =
               Zsublist mp (l1 + mp) patn).
       { apply (periodic_segment' default patn mp 1); auto; try lia. }
-
       rewrite <- H17 in H18.
       contradiction.
-
   - apply Hmmp.
 Qed.
 
@@ -630,7 +591,7 @@ Proof.
   1:{ apply maxsuf_cal_maxsuf_prop; auto. apply CmpA. }
   intros. destruct a as [l1 p1].
   apply Hoare_bind with (P := fun '(l, p) => maxsuf_prop cmp_rev l p).
-  1:{ apply maxsuf_cal_maxsuf_prop; auto. apply (Cmp_rev cmp). }
+  1:{ apply maxsuf_cal_maxsuf_prop; auto. apply Cmp_rev. }
   intros. destruct a as [l2 p2].
   hoare_auto; unfold match_phase; hoare_auto.
   - (* 右临界位，重复模式 *)
@@ -651,7 +612,6 @@ Proof.
     assert (crit_factor_prop l1 p').
     { apply (crit_factor_prop_lnrep l1 p1 l2 p2); auto. }
     apply match_algo_correct; auto.
-
 Qed.
 
 (* TODO：匹配阶段的名字修正，以及全部英文化+结构整理 *)

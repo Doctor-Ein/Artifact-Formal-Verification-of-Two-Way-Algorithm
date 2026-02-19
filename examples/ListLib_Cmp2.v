@@ -12,68 +12,74 @@ Import ListNotations.
 Local Open Scope Z_scope.
 Local Open Scope list.
 
-Parameter (A : Type).
-Parameter (default : A).
 
-Class Cmp (cmp_fn : A -> A -> comparison)  := {
-  cmp_Lt_Gt : forall x y, cmp_fn x y = Lt -> cmp_fn y x = Gt;
-  cmp_Gt_Lt : forall x y, cmp_fn x y = Gt -> cmp_fn y x = Lt;
-  cmp_Eq    : forall x y, cmp_fn x y = Eq -> x = y /\ cmp_fn y x = Eq;
-  cmp_refl  : forall x, cmp_fn x x = Eq;
-  cmp_trans : forall x y z, cmp_fn x y = Gt -> cmp_fn y z = Gt -> cmp_fn x z = Gt
-}.
+Section lex_cmp.
+Context {A : Type}
+        (default : A).
+Context (cmp : A -> A -> comparison).
+(* a default cmparison function *)
 
-Parameter cmp : A -> A -> comparison.
-Parameter CmpA : Cmp cmp.
-Existing Instance CmpA.
-
-Definition cmp_rev : A -> A -> comparison :=
+Definition cmp_rev' : A -> A -> comparison :=
   fun x y => CompOpp (cmp x y).
 
-Instance Cmp_rev : Cmp cmp_rev.
+Class Cmp (cmp : A -> A -> comparison)  := {
+  cmp_Lt_Gt : forall x y, cmp x y = Lt -> cmp y x = Gt;
+  cmp_Gt_Lt : forall x y, cmp x y = Gt -> cmp y x = Lt;
+  cmp_Eq    : forall x y, cmp x y = Eq -> x = y /\ cmp y x = Eq;
+  cmp_refl  : forall x, cmp x x = Eq;
+  cmp_trans : forall x y z, cmp x y = Gt -> cmp y z = Gt -> cmp x z = Gt
+}.
+
+Context `{Cmp cmp}. (* introduce a Cmp class for default order *)
+
+Instance Cmp_rev : Cmp cmp_rev'.
 Proof.
   constructor.
   - (* Lt -> Gt *)
     intros.
-    unfold cmp_rev in *.
+    unfold cmp_rev' in *.
     pose proof cmp_Gt_Lt x y.
     destruct (cmp x y); try discriminate.
-    rewrite H0; auto.
+    rewrite H1; auto.
   - (* Gt -> Lt *)
     intros.
-    unfold cmp_rev in *.
+    unfold cmp_rev' in *.
     pose proof cmp_Lt_Gt x y.
     destruct (cmp x y); try discriminate.
-    rewrite H0; auto.
+    rewrite H1; auto.
   - (* Eq *)
     intros.
-    unfold cmp_rev in *.
+    unfold cmp_rev' in *.
     pose proof cmp_Eq x y.
     destruct (cmp x y); try discriminate.
-    destruct H0; try auto.
-    rewrite H1. auto.
+    destruct H1; try auto.
+    rewrite H2. auto.
   - (* refl *)
     intros.
-    unfold cmp_rev.
+    unfold cmp_rev'.
     rewrite cmp_refl.
     auto.
   - (* trans *)
     intros.
-    unfold cmp_rev in *.
+    unfold cmp_rev' in *.
     pose proof cmp_trans z y x.
     pose proof cmp_Lt_Gt x y.
     pose proof cmp_Lt_Gt y z.
     destruct (cmp x y); destruct (cmp y z); try discriminate.
-    specialize (H2 ltac:(easy)).
     specialize (H3 ltac:(easy)).
-    specialize (H1 H3 H2).
-    pose proof cmp_Gt_Lt z x H1.
-    rewrite H4. auto.
+    specialize (H4 ltac:(easy)).
+    specialize (H2 H4 H3).
+    pose proof cmp_Gt_Lt z x H2.
+    rewrite H5. auto.
 Qed.
+
+End lex_cmp.
 
 (* =============== Two Instance ================ *)
 
 Section list_lex_cmp.
+Context {A : Type}
+        (default : A).
 
 Definition list_lex_gt_ex (cmp_fn : A -> A -> comparison) (l1 l2 : list A) : Prop :=
   exists p x y l1' l2',
@@ -800,6 +806,13 @@ Qed.
 End list_lex_cmp.
 
 Section list_lex_lemma.
+Context {A : Type}
+        (default : A)
+        (cmp : A -> A -> comparison).
+Context `{Cmp A cmp}.
+
+Definition cmp_rev : A -> A -> comparison :=
+  cmp_rev' cmp.
 
 Lemma prefix_ordering (w w' : list A):
     list_lex_ge cmp w w' ->
@@ -830,17 +843,17 @@ Proof.
     assert (Zsublist 0 (Zlength p') (p ++ x :: l1) 
           = Zsublist 0 (Zlength p') (p ++ y :: l2)).
     { rewrite <- H1. rewrite <- H2. reflexivity. }
-    apply (f_equal (fun l => Znth (Zlength p) l default)) in H.
-    rewrite Znth_Zsublist in H; try lia.
+    apply (f_equal (fun l => Znth (Zlength p) l default)) in H0.
+    rewrite Znth_Zsublist in H0; try lia.
     2:{ split; [ apply Zlength_nonneg | lia]. }
-    rewrite Znth_Zsublist in H; try lia.
+    rewrite Znth_Zsublist in H0; try lia.
     2:{ split; [ apply Zlength_nonneg | lia]. }
-    replace (Zlength p + 0) with (Zlength p) in H by lia.
-    rewrite Znth_Zsublist_single in H.
-    rewrite Znth_Zsublist_single in H.
+    replace (Zlength p + 0) with (Zlength p) in H0 by lia.
+    rewrite Znth_Zsublist_single in H0.
+    rewrite Znth_Zsublist_single in H0.
     assert (cmp x y = Eq).
-    { rewrite H. apply cmp_refl. }
-    rewrite Hcmp in H0. discriminate.
+    { rewrite H0. apply cmp_refl. }
+    rewrite Hcmp in H3. discriminate.
   - apply (f_equal (fun l => Znth (Zlength p) l default)) in H1.
     apply (f_equal (fun l => Znth (Zlength p') l default)) in H1'.
     rewrite Znth_Zsublist_single in H1.
@@ -855,6 +868,7 @@ Proof.
     rewrite H2 in H2'.
     rewrite H1' in Hcmp. rewrite H2' in Hcmp.
     unfold cmp_rev in Hcmp_rev.
+    unfold cmp_rev' in Hcmp_rev.
     destruct (cmp x' y'); try discriminate.
   - apply (f_equal (fun l => Zsublist 0 (Zlength p) l)) in H1'.
     apply (f_equal (fun l => Zsublist 0 (Zlength p) l)) in H2'.
@@ -864,17 +878,18 @@ Proof.
     assert (Zsublist 0 (Zlength p) (p' ++ x' :: l1') 
           = Zsublist 0 (Zlength p) (p' ++ y' :: l2')).
     { rewrite <- H1'. rewrite <- H2'. reflexivity. }
-    apply (f_equal (fun l => Znth (Zlength p') l default)) in H.
-    rewrite Znth_Zsublist in H; try lia.
+    apply (f_equal (fun l => Znth (Zlength p') l default)) in H0.
+    rewrite Znth_Zsublist in H0; try lia.
     2:{ split; [ apply Zlength_nonneg | lia]. }
-    rewrite Znth_Zsublist in H; try lia.
+    rewrite Znth_Zsublist in H0; try lia.
     2:{ split; [ apply Zlength_nonneg | lia]. }
-    replace (Zlength p' + 0) with (Zlength p') in H by lia.
-    rewrite Znth_Zsublist_single in H.
-    rewrite Znth_Zsublist_single in H.
+    replace (Zlength p' + 0) with (Zlength p') in H0 by lia.
+    rewrite Znth_Zsublist_single in H0.
+    rewrite Znth_Zsublist_single in H0.
     assert (cmp x' y' = Eq).
-    { rewrite H. apply cmp_refl. }
+    { rewrite H0. apply cmp_refl. }
     unfold cmp_rev in Hcmp_rev.
+    unfold cmp_rev' in Hcmp_rev.
     destruct (cmp x' y'); try discriminate.
 Qed.
 
