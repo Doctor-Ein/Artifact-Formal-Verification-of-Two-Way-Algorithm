@@ -229,6 +229,39 @@ Proof.
   intros.
   unfold is_period.
   split;[lia|].
-Admitted.
+  intros i Hi Hip.
+  assert (i < Zlength u \/ Zlength u <= i) by lia.
+  destruct H3.
+  - rewrite app_Znth1; try lia.
+    rewrite app_Znth2; try lia.
+    2:{ rewrite H0. rewrite Zlength_app.
+        pose proof Zlength_nonneg z. lia. }
+    rewrite H1.
+    replace (i + p - Zlength u) with (i + Zlength z) by (rewrite H0, Zlength_app; lia).
+    rewrite app_Znth2; try lia.
+    rewrite app_Znth1; try lia.
+    replace (i + Zlength z - Zlength z) with i by lia.
+    reflexivity.
+  - set (j := i - Zlength u).
+    rewrite app_Znth2; try lia.
+    rewrite app_Znth2; try lia.
+    replace (i + p - Zlength u) with (j + p) by (subst j; lia).
+    rewrite Zlength_app in Hip.
+    assert (j + p < Zlength v) by (subst j; lia).
+    destruct H2 as [w Hw].
+    assert (p = Zlength v - Zlength z') by (rewrite H0, H1; repeat rewrite Zlength_app; lia).
+    replace v with (z' ++ w) in *.
+    assert (j < Zlength z') by lia.
+    rewrite app_Znth1; try lia.
+    rewrite H1.
+    rewrite app_Znth2; try lia.
+    2:{ rewrite H0. rewrite Zlength_app.
+        pose proof Zlength_nonneg u. lia. }
+    replace (j + p - Zlength z) with (j + Zlength u).
+    2:{ rewrite H0. rewrite Zlength_app. lia. }
+    rewrite app_Znth2; try lia.
+    replace (j + Zlength u - Zlength u) with j by lia.
+    unfold j. reflexivity.
+Qed.
 
 End list_period_lemma.

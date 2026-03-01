@@ -28,7 +28,7 @@ Parameter (text : list A).
 
 Parameter mp : Z.
 Axiom mp_existence : is_minimal_period default patn mp. (* Assume the logical existence of the global period *)
-Axiom mp_range : 0 < mp <= Zlength patn.
+Axiom mp_range : 0 < mp <= Zlength patn. (* Assume the logical minimal period is less than Zlength patn *)
 
 Section critical_factorization_theorem.
 
