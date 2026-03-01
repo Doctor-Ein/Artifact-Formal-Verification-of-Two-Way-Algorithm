@@ -32,7 +32,7 @@ that are not the main focus of the paper.
 │       ├── MonadErrHoare.v    # Hoare logic and tactics
 │       └── monadsafe_lib.v*   # Auxiliary library for relational Hoare logic
 └── examples
-    ├── MaximalSuffix.v   # Preprocess phase proof
+    ├── PreProcessing.v   # Preprocess phase proof
     ├── TwoWayMatch.v     # Match phase proof
     └── TwoWayComplete.v  # Main proof: complete verification of two-way algorithm
 ````

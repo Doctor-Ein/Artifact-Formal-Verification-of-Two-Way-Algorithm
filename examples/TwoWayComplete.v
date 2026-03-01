@@ -89,33 +89,57 @@ Lemma l_less_mp (cmp_fn : A -> A -> comparison) (l p : Z):
   Cmp cmp_fn ->
   patn <> nil ->
   maxsuf_prop cmp_fn l p ->
-  0 <= l < mp /\ mp <= Zlength patn.
+  0 <= l < mp /\ l + p <= Zlength patn.
 Proof.
   intros Cmpfn. intros.
   destruct H0. (* Should reuse prior results *)
   destruct Hper0.
-  split; [|apply mp_range]. (* Show the critical split position is < global period *)
-  pose proof mp_range as mp_range.
-  pose proof mp_existence as mp_existence.
-  destruct Hmaxsuf0.
-  assert (l < mp \/ l >= mp) by lia.
-  destruct H4; try lia.
-  set (l' := l - mp).
-  specialize (H3 l' ltac:(lia)).
-  assert (list_lex_gt cmp_fn (skipn' l' patn) (skipn' l patn)).
-  { unfold list_lex_gt. right.
-    unfold skipn'. split.
-    - exists (Zsublist (Zlength patn - mp) (Zlength patn) patn).
-      rewrite (Zsublist_split l' _ (Zlength patn - mp)); try lia.
-      subst l'.
-      assert (Zsublist (l - mp) (Zlength patn - mp) patn =
-              Zsublist l (Zlength patn) patn).
-      { destruct mp_existence.
-        apply (periodic_segment' default patn mp 1); auto; try lia. }
-      rewrite H5. reflexivity.
-    - repeat rewrite Zlength_Zsublist; try lia. }
-  pose proof ge_discriminate_gt _ _ _ Cmpfn H3 H5.
-  tauto.
+  split. (* Show the critical split position is < global period *)
+  - pose proof mp_range as mp_range.
+    pose proof mp_existence as mp_existence.
+    destruct Hmaxsuf0.
+    assert (l < mp \/ l >= mp) by lia.
+    destruct H4; try lia.
+    set (l' := l - mp).
+    specialize (H3 l' ltac:(lia)).
+    assert (list_lex_gt cmp_fn (skipn' l' patn) (skipn' l patn)).
+    { unfold list_lex_gt. right.
+      unfold skipn'. split.
+      - exists (Zsublist (Zlength patn - mp) (Zlength patn) patn).
+        rewrite (Zsublist_split l' _ (Zlength patn - mp)); try lia.
+        subst l'.
+        assert (Zsublist (l - mp) (Zlength patn - mp) patn =
+                Zsublist l (Zlength patn) patn).
+        { destruct mp_existence.
+          apply (periodic_segment' default patn mp 1); auto; try lia. }
+        rewrite H5. reflexivity.
+      - repeat rewrite Zlength_Zsublist; try lia. }
+    pose proof ge_discriminate_gt _ _ _ Cmpfn H3 H5.
+    tauto.
+  - assert (is_minimal_period default (skipn' l patn) p).
+    { split; auto. }
+    destruct Hmaxsuf0.
+    assert (p <= Zlength patn - l).
+    { pose proof minimal_period_le_Zlength default (skipn' l patn) p.
+      assert (skipn' l patn <> nil).
+      { unfold skipn'. intros Hnot.
+        assert (l = Zlength patn).
+        { apply (f_equal (fun l => Zlength l)) in Hnot.
+          rewrite Zlength_Zsublist in Hnot; try lia.
+          rewrite Zlength_nil in Hnot. lia. }
+        pose proof H4 0 ltac:(lia).
+        rewrite H6 in H7. unfold skipn' in H7.
+        rewrite Zsublist_nil in H7; try lia.
+        rewrite Zsublist_all in H7.
+        destruct H7; [|auto].
+        pose proof list_lex_ge_nil cmp_fn patn.
+        pose proof ge_discriminate_gt _ _ _ _ H8 H7.
+        tauto.
+      }
+      pose proof H5 H6 H2.
+      unfold skipn' in H7.
+      rewrite Zlength_Zsublist in H7; try lia.
+    } lia.
 Qed.
 
 Lemma crit_factor_prop_rrep (l1 p1 l2 p2 : Z):
@@ -158,6 +182,7 @@ Proof.
     replace l2 with (Z.max l1 l2) by lia.
     apply fwd_rev_maxsuffix_cut_critical_factorization; auto.
     apply mp_existence. }
+  pose proof l_less_mp cmp_rev l2 p2 Cmp_rev H H1 as H_l2p2.
   constructor.
   - apply (l_less_mp cmp_rev l2 p2 Cmp_rev); auto.
   - (* Key step: the updated p' still satisfies p' <= global period *)
@@ -193,47 +218,123 @@ Proof.
       { unfold local_period.
         split; [|split]; try lia.
         intros.
-        assert (Zsublist (l2 - r) l2 patn = Zsublist (l2 + mp - r) (l2 + mp) patn).
-        { apply (periodic_segment' default patn mp 1); auto; try lia. }
-        set (v := skipn' l2 patn).
-        assert (p2 <= mp).
-        { apply (suffix_less_period default patn v).
-          - subst v. unfold skipn'.
-            rewrite <- (Zsublist_all patn) at 3.
-            apply Zsublist_is_suffix; try lia.
-          - apply mp_existence.
-          - split; try auto. }
-        assert (Zsublist l2 (l2 + r) patn = Zsublist (l2 + mp - r) (l2 + mp) patn).
-        { assert (Zsublist 0 r v = Zsublist (mp - r) mp v).
-          { rewrite H14.
-            apply (periodic_segment' default v p2 q); auto; try lia.
-            - unfold v. unfold skipn'. 
-              rewrite Zlength_Zsublist; try lia.
-            - split; try lia.
-              rewrite <- H14.
-              subst v. unfold skipn'.
-              rewrite Zlength_Zsublist; try lia. }
-          subst v. unfold skipn' in H21.
-          rewrite Zsublist_Zsublist in H21; try lia.
-          rewrite Zsublist_Zsublist in H21; try lia.
-          simpl in H21.
-          rewrite Z.add_comm in H21.
-          replace (l2 + mp - r) with (mp - r + l2) by lia.
-          replace (l2 + mp) with (mp + l2) by lia.
-          apply H21. }
-        rewrite <- H21 in H19.
-        assert (l2 - r < 0 \/ l2 - r >= 0) by lia.
-        destruct H22.
-        1:{ apply (f_equal (fun l => Zlength l)) in H19.
-            rewrite Zsublist_neg_iff_Zsublist_zero in H19; try lia.
-            rewrite Zlength_Zsublist in H19; try lia.
-            rewrite Zlength_Zsublist in H19; try lia. }
-        apply (f_equal (fun l => Znth i l default)) in H19.
-        rewrite Znth_Zsublist in H19; try lia.
-        rewrite Znth_Zsublist in H19; try lia.
-        replace (l2 + i - r) with (i + (l2 - r)) by lia.
-        replace (l2 + i) with (i + l2) by lia.
-        apply H19. }
+        assert (0 <= l2 - r \/ l2 - r < 0) by lia.
+        destruct H19 as [Hr | Hr].
+        - assert (Zsublist (l2 - r) l2 patn = Zsublist (l2 + mp - r) (l2 + mp) patn).
+          { apply (periodic_segment' default patn mp 1); auto; try lia. }
+          set (v := skipn' l2 patn).
+          assert (p2 <= mp).
+          { apply (suffix_less_period default patn v).
+            - subst v. unfold skipn'.
+              rewrite <- (Zsublist_all patn) at 3.
+              apply Zsublist_is_suffix; try lia.
+            - apply mp_existence.
+            - split; try auto. }
+          assert (Zsublist l2 (l2 + r) patn = Zsublist (l2 + mp - r) (l2 + mp) patn).
+          { assert (Zsublist 0 r v = Zsublist (mp - r) mp v).
+            { rewrite H14.
+              apply (periodic_segment' default v p2 q); auto; try lia.
+              - unfold v. unfold skipn'. 
+                rewrite Zlength_Zsublist; try lia.
+              - split; try lia.
+                rewrite <- H14.
+                subst v. unfold skipn'.
+                rewrite Zlength_Zsublist; try lia. }
+            subst v. unfold skipn' in H21.
+            rewrite Zsublist_Zsublist in H21; try lia.
+            rewrite Zsublist_Zsublist in H21; try lia.
+            simpl in H21.
+            rewrite Z.add_comm in H21.
+            replace (l2 + mp - r) with (mp - r + l2) by lia.
+            replace (l2 + mp) with (mp + l2) by lia.
+            apply H21. }
+          rewrite <- H21 in H19.
+          assert (l2 - r < 0 \/ l2 - r >= 0) by lia.
+          destruct H22.
+          1:{ apply (f_equal (fun l => Zlength l)) in H19.
+              rewrite Zsublist_neg_iff_Zsublist_zero in H19; try lia. }
+          apply (f_equal (fun l => Znth i l default)) in H19.
+          rewrite Znth_Zsublist in H19; try lia.
+          rewrite Znth_Zsublist in H19; try lia.
+          replace (l2 + i - r) with (i + (l2 - r)) by lia.
+          replace (l2 + i) with (i + l2) by lia.
+          apply H19.
+        - assert (l2 + mp <= Zlength patn \/ l2 + mp > Zlength patn) by lia.
+          destruct H19 as [Hl2mp|Hl2mp].
+          + assert (Hseg2: Zsublist l2 (l2 + r) patn = Zsublist (l2 + mp - r) (l2 + mp) patn).
+            { assert (0 <= r < p2).
+              { apply (Z.mod_bound_pos mp p2); try lia. }
+              assert (p2 <= mp).
+              { assert (is_period default (skipn' l2 patn) mp).
+                { apply (suffix_contains_period _ patn _).
+                  - unfold skipn'. rewrite <- Zsublist_all.
+                    apply Zsublist_is_suffix; try lia.
+                  - pose proof mp_existence.
+                    destruct H20. auto. }
+                pose proof H12 mp H20. lia. }
+              
+              rewrite H14.
+              replace (l2 + (p2 * q + r) - r) with (l2 + p2 * q) by lia.
+              replace (l2 + (p2 * q + r)) with (l2 + p2 * q + r) by lia.
+              set (patn' := skipn' l2 patn).
+              assert (Zsublist 0 r patn' = Zsublist (p2 * q) (p2 * q + r) patn').
+              { apply (periodic_segment' default patn' p2 q); auto; try lia.
+                - unfold patn', skipn'. rewrite Zlength_Zsublist; try lia.
+                - split; try lia. rewrite <- H14.
+                  unfold patn', skipn'. rewrite Zlength_Zsublist; try lia.
+              }
+              unfold patn', skipn' in H21.
+              rewrite Zsublist_Zsublist in H21; try lia.
+              rewrite Zsublist_Zsublist in H21; try lia.
+              simpl in H21.
+              replace (l2 + r) with (r + l2) by lia.
+              replace (l2 + p2 * q) with (p2 * q + l2) by lia.
+              replace (p2 * q + l2 + r) with (p2 * q + r + l2) by lia.
+              auto. }
+            
+            assert (Znth (l2 + i - r + mp) patn default = Znth (l2 + i - r) patn default).
+            { pose proof mp_existence. 
+              destruct H19; destruct H19.
+              symmetry. apply (H21 (l2 + i - r)); try lia. }
+            apply (f_equal (fun l => Znth i l default)) in Hseg2.
+            rewrite Znth_Zsublist in Hseg2; try lia.
+            rewrite Znth_Zsublist in Hseg2; try lia.
+            2:{ rewrite H14.
+                assert (0 <= q).
+                { apply Z_div_pos; try lia. }
+                lia. }
+            rewrite <- H19.
+            symmetry. replace (l2 + i) with (i + l2) by lia.
+            replace (i + (l2 + mp - r)) with (i + l2 - r + mp) in Hseg2 by lia.
+            auto.
+          + assert (0 <= l2 < mp /\ l2 + p2 <= Zlength patn). 
+            { apply (l_less_mp cmp_rev l2 p2 Cmp_rev); try auto.
+              split; [split|split]; auto. }
+            destruct H19.
+            assert (0 <= r < p2).
+            { apply (Z.mod_bound_pos mp p2); try lia. }
+            assert (p2 <= mp).
+            { assert (is_period default (skipn' l2 patn) mp).
+              { apply (suffix_contains_period _ patn _).
+                - unfold skipn'. rewrite <- Zsublist_all.
+                  apply Zsublist_is_suffix; try lia.
+                - pose proof mp_existence.
+                  destruct H22. auto. }
+              pose proof H12 mp H22. lia. }
+            assert (1 <= q) by nia.
+            assert (l2 + mp - p2 <= Zlength patn).
+            { assert (l2 + mp - p2 <= Zlength patn \/ l2 + mp - p2 > Zlength patn) by lia. 
+              destruct H24; [auto|].
+              assert (mp > Zlength patn) by lia.
+              pose proof mp_range. lia. (* Contradiction *) }
+            assert (Znth (l2 + i) patn default = Znth (l2 + i - r + mp - p2) patn default).
+            { set (patn' := skipn' l2 patn).
+              assert (Zsublist 0 r patn' = Zsublist (mp - p2 - r) (mp - p2) patn').
+              { apply (periodic_segment' default patn' p2 (q - 1)); auto; try lia. }
+              unfold patn', skipn' in H25.
+              rewrite Zsublist_Zsublist in H25; try lia. } (* MARK: easy ends *)
+            lia. (* MARK: auto find a contradiction *)
+      }
       destruct Hmmp.
       specialize (H18 r H16).
       assert (p2 <= mp).
@@ -255,12 +356,23 @@ Proof.
           { set (v := skipn' l2 patn).
             assert (Zsublist 0 p2 v = Zsublist (mp - p2) mp v).
             { rewrite H14.
-              apply (periodic_segment' default v p2 (q - 1)); auto; try lia;
-              unfold v; unfold skipn'; 
-              rewrite Zlength_Zsublist; try lia. }
+              assert (0 <= q - 1 \/ q - 1 < 0) by lia.
+              destruct H18.
+              - apply (periodic_segment' default v p2 (q - 1)); auto; try lia;
+                unfold v; unfold skipn';
+                rewrite Zlength_Zsublist; try lia.
+              - assert (0 <= q).
+                { pose proof mp_range.
+                  apply Z_div_pos; try lia. }
+                assert (q = 0) by lia.
+                rewrite H20 in *.
+                replace (p2 * 0) with 0 in * by lia.
+                simpl in *. pose proof mp_range.
+                lia. (* contradicton *)
+            }
             subst v. unfold skipn' in H18.
             rewrite Zsublist_Zsublist in H18; try lia.
-            assert (0 <= l2 < mp /\ mp <= Zlength patn).
+            assert (0 <= l2 < mp).
             { apply (l_less_mp cmp_rev l2 p2 Cmp_rev); auto.
               split; [split|split]; auto. }
             rewrite Zsublist_Zsublist in H18; try lia.
@@ -312,12 +424,12 @@ Proof.
           rewrite Zlength_Zsublist; try lia. }
         subst v. unfold skipn' in *.
         rewrite Zsublist_Zsublist in H18; try lia.
-        2:{ rewrite Zlength_Zsublist in H17; try lia. }
+        (* 2:{ rewrite Zlength_Zsublist in H17; try lia. } *)
         rewrite Zsublist_Zsublist in H18; try lia.
-        2:{ assert (0 <= l2 < mp /\ mp <= Zlength patn).
+        (* 2:{ assert (0 <= l2 < mp /\ mp <= Zlength patn).
             { apply (l_less_mp cmp_rev l2 p2 Cmp_rev); auto.
               split; split; auto. }
-            lia. }
+            lia. } *)
         replace (p2 - l2 + l2) with p2 in H18 by lia.
         replace (mp - l2 + l2) with mp in H18 by lia.
         replace (l2 + p2) with (p2 + l2) by lia.
@@ -370,18 +482,17 @@ Proof.
     replace l1 with (Z.max l1 l2) by lia.
     apply fwd_rev_maxsuffix_cut_critical_factorization; auto.
     apply mp_existence. }
+  pose proof l_less_mp cmp l1 p1 CmpA H H0 as H_l1p1.
   constructor.
   - apply (l_less_mp cmp l1 p1 CmpA); auto.
-  - assert (l1 >= (Zlength patn - l1) \/
-            l1 < (Zlength patn - l1)) by lia.
+  - assert (l1 >= (Zlength patn - l1) \/ l1 < (Zlength patn - l1)) by lia.
     destruct H4.
     1:{ assert (p' = l1 + 1) by lia.
         pose proof l_less_mp cmp l1 p1 CmpA H H0.
         lia. }
     assert (p' = Zlength patn - l1 + 1) by lia.
     destruct H0. destruct Hmaxsuf0.
-    assert (mp <= Zlength patn - l1 \/
-            mp > Zlength patn - l1) by lia.
+    assert (mp <= Zlength patn - l1 \/ mp > Zlength patn - l1) by lia.
     destruct H7; [|lia].
     pose proof mp_existence.
     destruct H8.
@@ -390,7 +501,7 @@ Proof.
       - rewrite <- (Zsublist_all patn) at 2.
         unfold skipn'.
         apply Zsublist_is_suffix; try lia.
-      - destruct mp_existence; auto. }
+      - destruct mp_existence. auto. }
     destruct Hper0.
     pose proof H11 as H11'.
     destruct H11.
@@ -401,58 +512,126 @@ Proof.
     assert (0 < r < p1 \/ r = 0).
     { pose proof Z.mod_pos_bound mp p1 H11. lia. }
     destruct H15.
-    + (* 0 < r < p1 *)
-      assert (local_period l1 r).
+    + assert (local_period l1 r).
       { unfold local_period.
         split; [|split]; try lia.
         intros.
-        assert (Zsublist (l1 - r) l1 patn =
-                Zsublist (l1 + mp - r) (l1 + mp) patn).
-        { apply (periodic_segment' default patn mp 1); auto; try lia. }
-        set (v := skipn' l1 patn).
-        assert (p1 <= mp).
-        { apply (suffix_less_period default patn v).
-          - subst v. unfold skipn'.
-            rewrite <- (Zsublist_all patn) at 3.
-            apply Zsublist_is_suffix; try lia.
-          - apply mp_existence.
-          - split; auto. }
-        assert (Zsublist l1 (l1 + r) patn =
-                Zsublist (l1 + mp - r) (l1 + mp) patn).
-        { assert (Zsublist 0 r v =
-                  Zsublist (mp - r) mp v).
-          { rewrite H14.
-            apply (periodic_segment' default v p1 q); auto; try lia.
-            - unfold v, skipn'.
-              rewrite Zlength_Zsublist; try lia.
-            - split; try lia.
-              rewrite <- H14.
-              unfold v, skipn'.
-              rewrite Zlength_Zsublist; try lia. }
-          subst v.
-          unfold skipn' in H21.
-          rewrite Zsublist_Zsublist in H21; try lia.
-          rewrite Zsublist_Zsublist in H21; try lia.
-          simpl in H21.
-          rewrite Z.add_comm in H21.
-          replace (l1 + mp - r) with (mp - r + l1) by lia.
-          replace (l1 + mp) with (mp + l1) by lia.
-          apply H21. }
-        rewrite <- H21 in H19.
-        assert (l1 - r < 0 \/ l1 - r >= 0) by lia.
-        destruct H22.
-        1:{
-          apply (f_equal (fun l => Zlength l)) in H19.
-          rewrite Zsublist_neg_iff_Zsublist_zero in H19; try lia.
-          rewrite Zlength_Zsublist in H19; try lia.
-          rewrite Zlength_Zsublist in H19; try lia.
-        }
-        apply (f_equal (fun l => Znth i l default)) in H19.
-        rewrite Znth_Zsublist in H19; try lia.
-        rewrite Znth_Zsublist in H19; try lia.
-        replace (l1 + i - r) with (i + (l1 - r)) by lia.
-        replace (l1 + i) with (i + l1) by lia.
-        apply H19.
+        assert (0 <= l1 - r \/ l1 - r < 0) by lia.
+        destruct H19 as [Hr | Hr].
+        - assert (Zsublist (l1 - r) l1 patn = Zsublist (l1 + mp - r) (l1 + mp) patn).
+          { apply (periodic_segment' default patn mp 1); auto; try lia. }
+          set (v := skipn' l1 patn).
+          assert (p1 <= mp).
+          { apply (suffix_less_period default patn v).
+            - subst v. unfold skipn'.
+              rewrite <- (Zsublist_all patn) at 3.
+              apply Zsublist_is_suffix; try lia.
+            - apply mp_existence.
+            - split; try auto. }
+          assert (Zsublist l1 (l1 + r) patn = Zsublist (l1 + mp - r) (l1 + mp) patn).
+          { assert (Zsublist 0 r v = Zsublist (mp - r) mp v).
+            { rewrite H14.
+              apply (periodic_segment' default v p1 q); auto; try lia.
+              - unfold v. unfold skipn'.
+                rewrite Zlength_Zsublist; try lia.
+              - split; try lia.
+                rewrite <- H14.
+                subst v. unfold skipn'.
+                rewrite Zlength_Zsublist; try lia. }
+            subst v. unfold skipn' in H21.
+            rewrite Zsublist_Zsublist in H21; try lia.
+            rewrite Zsublist_Zsublist in H21; try lia.
+            simpl in H21.
+            rewrite Z.add_comm in H21.
+            replace (l1 + mp - r) with (mp - r + l1) by lia.
+            replace (l1 + mp) with (mp + l1) by lia.
+            apply H21. }
+          rewrite <- H21 in H19.
+          assert (l1 - r < 0 \/ l1 - r >= 0) by lia.
+          destruct H22.
+          1:{ apply (f_equal (fun l => Zlength l)) in H19.
+              rewrite Zsublist_neg_iff_Zsublist_zero in H19; try lia. }
+          apply (f_equal (fun l => Znth i l default)) in H19.
+          rewrite Znth_Zsublist in H19; try lia.
+          rewrite Znth_Zsublist in H19; try lia.
+          replace (l1 + i - r) with (i + (l1 - r)) by lia.
+          replace (l1 + i) with (i + l1) by lia.
+          apply H19.
+        - assert (l1 + mp <= Zlength patn \/ l1 + mp > Zlength patn) by lia.
+          destruct H19 as [Hl1mp|Hl1mp].
+          + assert (Hseg2: Zsublist l1 (l1 + r) patn = Zsublist (l1 + mp - r) (l1 + mp) patn).
+            { assert (0 <= r < p1).
+              { apply (Z.mod_bound_pos mp p1); try lia. }
+              assert (p1 <= mp).
+              { assert (is_period default (skipn' l1 patn) mp).
+                { apply (suffix_contains_period _ patn _).
+                  - unfold skipn'. rewrite <- Zsublist_all.
+                    apply Zsublist_is_suffix; try lia.
+                  - pose proof mp_existence.
+                    destruct H20. auto. }
+                pose proof H12 mp H20. lia. }
+              
+              rewrite H14.
+              replace (l1 + (p1 * q + r) - r) with (l1 + p1 * q) by lia.
+              replace (l1 + (p1 * q + r)) with (l1 + p1 * q + r) by lia.
+              set (patn' := skipn' l1 patn).
+              assert (Zsublist 0 r patn' = Zsublist (p1 * q) (p1 * q + r) patn').
+              { apply (periodic_segment' default patn' p1 q); auto; try lia.
+                - unfold patn', skipn'. rewrite Zlength_Zsublist; try lia.
+                - split; try lia. rewrite <- H14.
+                  unfold patn', skipn'. rewrite Zlength_Zsublist; try lia.
+              }
+              unfold patn', skipn' in H21.
+              rewrite Zsublist_Zsublist in H21; try lia.
+              rewrite Zsublist_Zsublist in H21; try lia.
+              simpl in H21.
+              replace (l1 + r) with (r + l1) by lia.
+              replace (l1 + p1 * q) with (p1 * q + l1) by lia.
+              replace (p1 * q + l1 + r) with (p1 * q + r + l1) by lia.
+              auto. }
+            
+            assert (Znth (l1 + i - r + mp) patn default = Znth (l1 + i - r) patn default).
+            { pose proof mp_existence. 
+              destruct H19; destruct H19.
+              symmetry. apply (H21 (l1 + i - r)); try lia. }
+            apply (f_equal (fun l => Znth i l default)) in Hseg2.
+            rewrite Znth_Zsublist in Hseg2; try lia.
+            rewrite Znth_Zsublist in Hseg2; try lia.
+            2:{ rewrite H14.
+                assert (0 <= q).
+                { apply Z_div_pos; try lia. }
+                lia. }
+            rewrite <- H19.
+            symmetry. replace (l1 + i) with (i + l1) by lia.
+            replace (i + (l1 + mp - r)) with (i + l1 - r + mp) in Hseg2 by lia.
+            auto.
+          + assert (0 <= l1 < mp /\ l1 + p1 <= Zlength patn). 
+            { apply (l_less_mp cmp l1 p1 CmpA); try auto.
+              split; [split|split]; auto. }
+            destruct H19.
+            assert (0 <= r < p1).
+            { apply (Z.mod_bound_pos mp p1); try lia. }
+            assert (p1 <= mp).
+            { assert (is_period default (skipn' l1 patn) mp).
+              { apply (suffix_contains_period _ patn _).
+                - unfold skipn'. rewrite <- Zsublist_all.
+                  apply Zsublist_is_suffix; try lia.
+                - pose proof mp_existence.
+                  destruct H22. auto. }
+              pose proof H12 mp H22. lia. }
+            assert (1 <= q) by nia.
+            assert (l1 + mp - p1 <= Zlength patn).
+            { assert (l1 + mp - p1 <= Zlength patn \/ l1 + mp - p1 > Zlength patn) by lia. 
+              destruct H24; [auto|].
+              assert (mp > Zlength patn) by lia.
+              pose proof mp_range. lia. }
+            assert (Znth (l1 + i) patn default = Znth (l1 + i - r + mp - p1) patn default).
+            { set (patn' := skipn' l1 patn).
+              assert (Zsublist 0 r patn' = Zsublist (mp - p1 - r) (mp - p1) patn').
+              { apply (periodic_segment' default patn' p1 (q - 1)); auto; try lia. }
+              unfold patn', skipn' in H25.
+              rewrite Zsublist_Zsublist in H25; try lia. }
+            lia.
       }
       destruct Hmmp.
       specialize (H18 r H16).
@@ -463,116 +642,92 @@ Proof.
           rewrite <- (Zsublist_all patn) at 3.
           apply Zsublist_is_suffix; try lia.
         - apply mp_existence.
-        - split; auto. }
+        - split; try auto. }
       lia.
-    + (* r = 0 *)
-      assert (p1 < l1 \/ p1 >= l1) by lia.
+    + assert (p1 < l1 \/ p1 >= l1) by lia.
       destruct H16.
-      1:{ assert (Zsublist (l1 - p1) l1 patn =
-                Zsublist (l1 + mp - p1) (l1 + mp) patn).
-        { apply (periodic_segment' default patn mp 1); auto; try lia. }
-        assert (Zsublist l1 (l1 + p1) patn =
-                Zsublist (l1 + mp - p1) (l1 + mp) patn).
-        { set (v := skipn' l1 patn).
-          assert (Zsublist 0 p1 v =
-                  Zsublist (mp - p1) mp v).
-          { rewrite H14.
-            apply (periodic_segment' default v p1 (q - 1));
-              auto; try lia;
-              unfold v, skipn';
-              rewrite Zlength_Zsublist; try lia. }
-          subst v.
-          unfold skipn' in H18.
-          rewrite Zsublist_Zsublist in H18; try lia.
-          rewrite Zsublist_Zsublist in H18; try lia.
-          2:{ assert (p1 <= mp).
+      1:{ assert (Zsublist (l1 - p1) l1 patn = 
+                  Zsublist (l1 + mp - p1) (l1 + mp) patn).
+          { apply (periodic_segment' default patn mp 1); auto; try lia. }
+          assert (Zsublist l1 (l1 + p1) patn =
+                  Zsublist (l1 + mp - p1) (l1 + mp) patn).
+          { set (v := skipn' l1 patn).
+            assert (Zsublist 0 p1 v = Zsublist (mp - p1) mp v).
+            { rewrite H14.
+              assert (0 <= q - 1 \/ q - 1 < 0) by lia.
+              destruct H18.
+              - apply (periodic_segment' default v p1 (q - 1)); auto; try lia;
+                unfold v; unfold skipn';
+                rewrite Zlength_Zsublist; try lia.
+              - assert (0 <= q).
+                { pose proof mp_range.
+                  apply Z_div_pos; try lia. }
+                assert (q = 0) by lia.
+                rewrite H20 in *.
+                replace (p1 * 0) with 0 in * by lia.
+                simpl in *. pose proof mp_range.
+                lia. }
+            subst v. unfold skipn' in H18.
+            rewrite Zsublist_Zsublist in H18; try lia.
+            assert (0 <= l1 < mp).
+            { apply (l_less_mp cmp l1 p1 CmpA); auto.
+              split; [split|split]; auto. }
+            rewrite Zsublist_Zsublist in H18; try lia.
+            simpl in H18.
+            rewrite Z.add_comm.
+            replace (l1 + mp - p1) with (mp - p1 + l1) by lia.
+            replace (l1 + mp) with (mp + l1) by lia.
+            apply H18. }
+            rewrite <- H18 in H17.
+            assert (local_period l1 p1).
+            { unfold local_period.
+              split; [|split]; try lia.
+              intros.
+              apply (f_equal (fun l => Znth i l default)) in H17.
+              rewrite Znth_Zsublist in H17; try lia.
+              rewrite Znth_Zsublist in H17; try lia.
+              replace (l1 + i - p1) with (i + (l1 - p1)) by lia.
+              replace (l1 + i) with (i + l1) by lia.
+              apply H17. }
+            assert (p1 = mp).
+            { destruct Hmmp.
+              specialize (H21 p1 H19).
+              assert (p1 <= mp).
               { set (v := skipn' l1 patn).
                 apply (suffix_less_period default patn v).
                 - subst v. unfold skipn'.
                   rewrite <- (Zsublist_all patn) at 3.
                   apply Zsublist_is_suffix; try lia.
                 - apply mp_existence.
-                - split; auto. }
-                lia. }
-          simpl in H18.
-          rewrite Z.add_comm.
-          replace (l1 + mp - p1) with (mp - p1 + l1) by lia.
-          replace (l1 + mp) with (mp + l1) by lia.
-          apply H18. }
-        rewrite <- H18 in H17.
-        assert (local_period l1 p1).
-        { unfold local_period.
-          split; [|split]; try lia.
-          intros.
-          apply (f_equal (fun l => Znth i l default)) in H17.
-          rewrite Znth_Zsublist in H17; try lia.
-          rewrite Znth_Zsublist in H17; try lia.
-          replace (l1 + i - p1) with (i + (l1 - p1)) by lia.
-          replace (l1 + i) with (i + l1) by lia.
-          apply H17. }
-        assert (p1 = mp).
-        { destruct Hmmp.
-          specialize (H21 p1 H19).
-          assert (p1 <= mp).
-          { set (v := skipn' l1 patn).
-            apply (suffix_less_period default patn v).
-            - subst v. unfold skipn'.
-              rewrite <- (Zsublist_all patn) at 3.
-              apply Zsublist_is_suffix; try lia.
-            - apply mp_existence.
-            - split; auto. }
-          lia. }
-        assert (Zsublist 0 l1 patn =
-                Zsublist p1 (l1 + p1) patn).
-        { apply (periodic_segment' default patn mp 1); auto; try lia. }
-        contradiction.
-      }
-      assert (Zsublist p1 (l1 + p1) patn =
-              Zsublist mp (l1 + mp) patn).
+                - split; try auto. }
+              lia. }
+            assert (Zsublist 0 l1 patn = Zsublist p1 (l1 + p1) patn).
+            { apply (periodic_segment' default patn mp 1); auto; try lia. }
+            contradiction. }
+      assert (Zsublist p1 (l1 + p1) patn = Zsublist mp (l1 + mp) patn).
       { set (v := skipn' l1 patn).
-        assert (Zsublist (p1 - l1) p1 v =
-                Zsublist (mp - l1) mp v).
-        { rewrite H14.
-          apply (periodic_segment' default v p1 (q - 1));
-          auto; try lia;
-          unfold v, skipn';
-          rewrite Zlength_Zsublist; try lia.
-          assert (is_minimal_period default v p1).
-          { split; auto. }
-          assert (p1 <= Zlength v).
-          { apply (minimal_period_le_Zlength default); auto.
-            unfold v, skipn'. intros Hnot. 
+        assert (p1 <= Zlength v).
+        { apply (minimal_period_le_Zlength default).
+          - intros Hnot. 
+            unfold v in Hnot. unfold skipn' in Hnot.
             apply (f_equal (fun l => Zlength l)) in Hnot.
             rewrite Zlength_Zsublist in Hnot; try lia.
-            rewrite Zlength_nil in Hnot. lia. }
-          unfold v, skipn' in H18.
-          rewrite Zlength_Zsublist in H18; try lia.
-        }
+            rewrite Zlength_nil in Hnot. lia.
+          - split; auto. }
+        assert (Zsublist (p1 - l1) p1 v = Zsublist (mp - l1) mp v).
+        { rewrite H14.
+          apply (periodic_segment' default v p1 (q - 1)); auto; try lia;
+          unfold v; unfold skipn';
+          rewrite Zlength_Zsublist; try lia. }
         subst v. unfold skipn' in *.
-        rewrite Zsublist_Zsublist in H17; try lia.
-        2:{ set (v := skipn' l1 patn).
-            assert (is_minimal_period default v p1).
-            { split; auto. }
-            assert (p1 <= Zlength v).
-            { apply (minimal_period_le_Zlength default); auto.
-              unfold v, skipn'. intros Hnot. 
-              apply (f_equal (fun l => Zlength l)) in Hnot.
-              rewrite Zlength_Zsublist in Hnot; try lia.
-              rewrite Zlength_nil in Hnot. lia. }
-            unfold v, skipn' in H19.
-            rewrite Zlength_Zsublist in H19; try lia. }
-        rewrite Zsublist_Zsublist in H17; try lia.
-        2:{ assert (0 <= l1 < mp /\ mp <= Zlength patn).
-            { apply (l_less_mp cmp l1 p1 CmpA); auto.
-              split; split; auto. }
-            lia. }
-        replace (p1 - l1 + l1) with p1 in H17 by lia.
-        replace (mp - l1 + l1) with mp in H17 by lia.
+        rewrite Zsublist_Zsublist in H18; try lia.
+        rewrite Zsublist_Zsublist in H18; try lia.
+        replace (p1 - l1 + l1) with p1 in H18 by lia.
+        replace (mp - l1 + l1) with mp in H18 by lia.
         replace (l1 + p1) with (p1 + l1) by lia.
         replace (l1 + mp) with (mp + l1) by lia.
-        apply H17. }
-      assert (Zsublist 0 l1 patn =
-              Zsublist mp (l1 + mp) patn).
+        apply H18. }
+      assert (Zsublist 0 l1 patn = Zsublist mp (l1 + mp) patn).
       { apply (periodic_segment' default patn mp 1); auto; try lia. }
       rewrite <- H17 in H18.
       contradiction.

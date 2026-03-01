@@ -13,6 +13,15 @@ Local Open Scope list.
 
 Section Zsublist_extend.
 
+Lemma Zsublist_all {A : Type} (l : list A):
+  Zsublist 0 (Zlength l) l = l.
+Proof.
+  unfold Zsublist. simpl.
+  rewrite Zlength_correct.
+  rewrite Nat2Z.id.
+  apply firstn_all.
+Qed.
+
 Lemma Zsublist_hi_plus_1 {A : Type} (default : A) (l1 l2 : list A) (lo hi lo' hi' : Z):
   (0 <= lo <= hi) ->
   (hi + 1 <= Zlength l1) ->
@@ -72,7 +81,16 @@ Lemma Zsublist_app_exact2 {A : Type} (l1 l2 : list A):
   forall len,
     len = Zlength l1 + Zlength l2 ->
     Zsublist (Zlength l1) len (l1 ++ l2) = l2.
-Proof. Admitted.
+Proof.
+  intros.
+  rewrite (Zsublist_split_app_r _ _ (Zlength l1)).
+  - replace (Zlength l1 - Zlength l1) with 0 by lia.
+    replace (len - Zlength l1) with (Zlength l2) by lia.
+    apply Zsublist_all.
+  - reflexivity.
+  - pose proof Zlength_nonneg l2.
+    lia.
+Qed.
 
 Lemma Zsublist_suffix_inv {A : Type} (lo hi : Z) (w l : list A):
   0 <= lo <= hi /\ hi <= Zlength l ->
@@ -100,27 +118,48 @@ Lemma Zsublist_suffix_range {A : Type} (lo hi : Z) (w l : list A):
   0 <= lo <= hi /\ hi <= Zlength l ->
   is_suffix w (Zsublist lo hi l) ->
   lo <= hi - Zlength w.
-Proof. Admitted.
+Proof.
+  intros.
+  destruct H0 as [v ?].
+  apply (f_equal (fun l => Zlength l)) in H0.
+  rewrite Zlength_Zsublist in H0; try lia.
+  rewrite Zlength_app in H0.
+  pose proof Zlength_nonneg v.
+  lia.
+Qed.  
 
 Lemma Zsublist_prefix_inv {A : Type} (lo hi : Z) (w l : list A):
   0 <= lo <= hi /\ hi <= Zlength l ->
   is_prefix w (Zsublist lo hi l) ->
   w = Zsublist lo (lo + Zlength w) l.
-Proof. Admitted.
+Proof.
+  intros H0 H.
+  destruct H as [w' H].
+  pose proof H as H'.
+  apply (f_equal (fun l => Zlength l)) in H.
+  rewrite Zlength_app in H.
+  rewrite Zlength_Zsublist in H.
+  assert (0 <= Zlength w /\ 0 <= Zlength w').
+  { split; apply Zlength_nonneg. }
+  apply (f_equal (fun l => Zsublist 0 (Zlength w) l)) in H'.
+  rewrite Zsublist_Zsublist in H'; simpl in *; try lia.
+  - rewrite Zsublist_app_exact1 in H'.
+    rewrite Z.add_comm. auto.
+  - auto.
+Qed.
 
 Lemma Zsublist_prefix_range {A : Type} (lo hi : Z) (w l: list A):
   0 <= lo <= hi /\ hi <= Zlength l ->
   is_prefix w (Zsublist lo hi l) ->
   lo + Zlength w <= hi.
-Proof. Admitted.
-
-Lemma Zsublist_all {A : Type} (l : list A):
-  Zsublist 0 (Zlength l) l = l.
 Proof.
-  unfold Zsublist. simpl.
-  rewrite Zlength_correct.
-  rewrite Nat2Z.id.
-  apply firstn_all.
+  intros.
+  destruct H0 as [v ?].
+  apply (f_equal (fun l => Zlength l)) in H0.
+  rewrite Zlength_Zsublist in H0; try lia.
+  rewrite Zlength_app in H0.
+  pose proof Zlength_nonneg v.
+  lia.
 Qed.
 
 Lemma Zsublist_eq_ext {A : Type} (default : A) (l1 l2 : list A):

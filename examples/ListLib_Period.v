@@ -24,22 +24,52 @@ Definition is_period {A : Type} (default : A) (l : list A) (p : Z) : Prop :=
 
 Lemma is_period_ext {A : Type} (default : A) (p q i j: Z) (l : list A): 
   is_period default l p ->
+  0 <= q -> (* Note *)
   0 <= i ->
   j = i + q * p ->
   j < Zlength l ->
   Znth i l default = Znth j l default.
 Proof.
-Admitted.
+  intros.
+  destruct H.
+  subst j.
+  set (nq := Z.to_nat q).
+  replace q with (Z.of_nat nq) in * by lia.
+  induction nq.
+  - simpl.
+    replace (i + 0) with i by lia.
+    reflexivity.
+  - rewrite Nat2Z.inj_succ.
+    replace (i + Z.succ (Z.of_nat nq) * p) with
+            (i + Z.of_nat nq * p + p) by lia.
+    pose proof H4 (i + Z.of_nat nq * p).
+    assert (0 <= i + Z.of_nat nq * p) by lia.
+    assert (i + Z.of_nat nq * p + p < Zlength l) by lia.
+    pose proof H2 H5 H6.
+    rewrite <- H7.
+    apply IHnq; try lia.
+Qed.
 
 Lemma periodic_segment' {A : Type} (default : A) (l : list A) (p q lo hi lo' hi' : Z): 
   is_period default l p ->
+  (0 <= q) ->
+  (0 <= lo) ->
   (lo <= hi <= Zlength l) ->
   (lo' <= hi' <= Zlength l) ->
   (lo' = lo + q * p) ->
   (hi - lo = hi' - lo') ->
   (Zsublist lo hi l = Zsublist lo' hi' l).
 Proof.
-Admitted.
+  intros. destruct H.
+  rewrite (list_eq_ext _ _ default).
+  split.
+  - repeat rewrite Zlength_Zsublist; try lia.
+  - intros. rewrite Zlength_Zsublist in H7; try lia.
+    repeat rewrite Znth_Zsublist; try lia.
+    rewrite H4.
+    apply (is_period_ext default p q); try lia.
+    split; auto.
+Qed.
 
 Definition is_minimal_period {A : Type} (default : A) (l : list A) (p : Z) : Prop :=
   is_period default l p /\ 

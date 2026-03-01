@@ -813,7 +813,7 @@ Qed.
 
 (* TODO: connect the proof from the maximal-suffix algorithm *)
 Record crit_factor_prop (l p : Z): Prop := {
-  Hrange_lp : 0 <= l < mp /\ mp <= Zlength patn; (* TODO: also prove the critical split position is < p *)
+  Hrange_lp : 0 <= l < mp; (* TODO: also prove the critical split position is < p *)
   Hp : 0 < p <= mp;
   Hcp: min_local_period l mp; (* Global period equals the minimal local period at the critical split *)
 }.
@@ -1010,7 +1010,7 @@ Proof.
     + destruct H3; [left; lia| right; unfold match_cond in H3; auto].
   - destruct H0.
     destruct H1.
-    constructor; [lia|].
+    constructor; [pose proof mp_range; lia|].
     repeat rewrite Zsublist_nil; try lia.
     reflexivity.
 Qed.
@@ -1254,20 +1254,22 @@ Proof.
           simpl in Hpm_mrp0.
           replace (Zlength patn - l + l) with (Zlength patn) in Hpm_mrp0 by lia.
           replace (Zlength patn - l + (pos + l)) with (pos + Zlength patn) in Hpm_mrp0 by lia.
-          apply Hpm_mrp0. }
+          auto.
+        }
         assert (Zsublist (l - (t - pos)) (Zlength patn - (t - pos)) patn = Zsublist (pos + l) (pos + Zlength patn) text).
         { apply (f_equal(fun lx => Zsublist (l - (t - pos)) (Zlength patn - (t - pos)) lx)) in Hnot.
           rewrite Zsublist_Zsublist in Hnot; try lia.
           replace (l - (t - pos) + t) with (pos + l) in Hnot by lia.
-          replace (Zlength patn - (t - pos) + t)  with (pos + Zlength patn) in Hnot by lia.
-          symmetry. apply Hnot. }
+          replace (Zlength patn - (t - pos) + t) with (pos + Zlength patn) in Hnot by lia.
+          auto.
+        }
         rewrite <- H7 in H8.
         apply (f_equal(fun lx => Znth i lx default)) in H8.
         rewrite Znth_Zsublist in H8; try lia.
         rewrite Znth_Zsublist in H8; try lia.
-        replace (i + (l - (t - pos))) with (l + i - (t - pos)) in H8 by lia.
-        replace (i + l) with (l + i) in H8 by lia.
-        apply H8.
+        replace (l + i - (t - pos)) with (i + (l - (t - pos))) by lia.
+        replace (l + i) with (i + l) by lia.
+        auto.
       - (* Both sides insufficient length *)
         assert (Zsublist (t - pos) (Zlength patn) patn = Zsublist t (pos + Zlength patn) text).
         { apply (f_equal(fun lx => Zsublist (t - pos - l) (Zlength patn - l) lx)) in Hpm_mrp0.
@@ -1275,22 +1277,24 @@ Proof.
           rewrite Zsublist_Zsublist in Hpm_mrp0; try lia.
           replace (t - pos - l + l) with (t - pos) in Hpm_mrp0 by lia.
           replace (Zlength patn - l + l) with (Zlength patn) in Hpm_mrp0 by lia.
-          replace (t - pos - l + (pos + l)) with t in Hpm_mrp0 by lia.
+          replace (t - pos - l + (pos + l)) with t in Hpm_mrp0 by lia. (* Small automation idea: simple replace trick *)
           replace (Zlength patn - l + (pos + l)) with (pos + Zlength patn) in Hpm_mrp0 by lia.
-          apply Hpm_mrp0. }
+          apply Hpm_mrp0.
+        }
         assert (Zsublist 0 (Zlength patn - (t - pos)) patn = Zsublist t (pos + Zlength patn) text).
         { apply (f_equal(fun lx => Zsublist 0 (Zlength patn - (t - pos)) lx)) in Hnot.
           rewrite Zsublist_Zsublist in Hnot; try lia.
-          simpl in Hnot.
+          replace (l - (t - pos) + t) with (pos + l) in Hnot by lia.
           replace (Zlength patn - (t - pos) + t) with (pos + Zlength patn) in Hnot by lia.
-          symmetry. apply Hnot. }
+          auto.
+        }
         rewrite <- H7 in H8.
         apply (f_equal(fun lx => Znth (l + i - (t - pos)) lx default)) in H8.
         rewrite Znth_Zsublist in H8; try lia.
         rewrite Znth_Zsublist in H8; try lia.
         replace (l + i - (t - pos) + 0) with (l + i - (t - pos)) in H8 by lia.
         replace (l + i - (t - pos) + (t - pos)) with (l + i) in H8 by lia.
-        apply H8.
+        auto.
     }
     unfold min_local_period in Hcp0.
     destruct Hcp0 as [Hcp0 Hcp1].
@@ -1387,7 +1391,8 @@ Proof.
       rewrite Zsublist_neg_iff_Zsublist_zero in Hpm_mlp0; try lia.
       rewrite Hpm_mlp0. replace (pos + -1 + 1) with pos by lia.
       rewrite Hpm_mrp0. reflexivity. (* Split into two segments --- l --- *)
-    + lia. (* Impossible, since match_left_inv ensures j ≥ -1 *)
+    + (* Impossible, since match_left_inv ensures j ≥ -1 *)
+      lia. 
 Qed.
 
 Lemma match_proof_break (l p pos : Z): 
